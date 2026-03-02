@@ -6,6 +6,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { store } from "@/lib/store/store";
 import { clearLoggedUser, setLoggedUser } from "@/lib/store/slices/auth-slice";
 import { useAppDispatch } from "@/lib/store/hooks";
+import { fetchTopbarData } from "@/lib/store/slices/topbar-slice";
 
 function AuthSessionSync() {
   const dispatch = useAppDispatch();
@@ -19,6 +20,7 @@ function AuthSessionSync() {
           name: session.user.name ?? null,
         }),
       );
+      void dispatch(fetchTopbarData());
       return;
     }
 

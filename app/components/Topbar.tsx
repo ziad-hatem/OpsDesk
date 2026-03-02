@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Bell, ChevronDown, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Button } from "./ui/button";
 import {
@@ -22,8 +23,17 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
-import type { MeResponse } from "@/lib/topbar/types";
-import { toast } from "sonner";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import {
+  createTopbarOrganization,
+  fetchTopbarData,
+  selectIsCreatingOrganization,
+  selectIsSwitchingOrganization,
+  selectTopbarData,
+  selectTopbarStatus,
+  selectTopbarUnreadCount,
+  switchTopbarOrganization,
+} from "@/lib/store/slices/topbar-slice";
 
 function getInitials(name: string | null, email: string): string {
   if (name) {
@@ -40,36 +50,38 @@ function getInitials(name: string | null, email: string): string {
 }
 
 export function Topbar() {
+  const dispatch = useAppDispatch();
   const router = useRouter();
+
+  const topbarData = useAppSelector(selectTopbarData);
+  const topbarStatus = useAppSelector(selectTopbarStatus);
+  const unreadCount = useAppSelector(selectTopbarUnreadCount);
+  const isSwitchingOrganization = useAppSelector(selectIsSwitchingOrganization);
+  const isCreatingOrganization = useAppSelector(selectIsCreatingOrganization);
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [createOrganizationOpen, setCreateOrganizationOpen] = useState(false);
   const [scratchOrganizationName, setScratchOrganizationName] = useState("");
-  const [topbarData, setTopbarData] = useState<MeResponse | null>(null);
-  const [isTopbarLoading, setIsTopbarLoading] = useState(true);
-  const [isSwitchingOrganization, setIsSwitchingOrganization] = useState(false);
-  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
-
-  const loadTopbarData = useCallback(async () => {
-    try {
-      const response = await fetch("/api/me", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      const data = (await response.json()) as MeResponse;
-      setTopbarData(data);
-    } finally {
-      setIsTopbarLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    void loadTopbarData();
-  }, [loadTopbarData]);
+    if (topbarStatus === "idle") {
+      void dispatch(fetchTopbarData());
+    }
+  }, [dispatch, topbarStatus]);
+
+  useEffect(() => {
+    const handleNotificationsUpdated = () => {
+      void dispatch(fetchTopbarData());
+    };
+
+    window.addEventListener("notifications:updated", handleNotificationsUpdated);
+    return () => {
+      window.removeEventListener(
+        "notifications:updated",
+        handleNotificationsUpdated,
+      );
+    };
+  }, [dispatch]);
 
   const activeOrganization = useMemo(() => {
     if (!topbarData) {
@@ -83,36 +95,25 @@ export function Topbar() {
     );
   }, [topbarData]);
 
-  const unreadCount = topbarData?.notifications.unreadCount ?? 0;
   const userName = topbarData?.user.name ?? null;
   const userEmail = topbarData?.user.email ?? "";
   const userAvatarUrl = topbarData?.user.avatar_url ?? null;
   const userInitials =
     userEmail || userName ? getInitials(userName, userEmail || "user@local") : "OD";
+  const isTopbarLoading = topbarStatus === "loading" && !topbarData;
 
   const handleOrganizationSwitch = async (organizationId: string) => {
     if (isSwitchingOrganization || topbarData?.activeOrgId === organizationId) {
       return;
     }
 
-    setIsSwitchingOrganization(true);
     try {
-      const response = await fetch("/api/me/active-organization", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ organizationId }),
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      await loadTopbarData();
-      router.refresh();
-    } finally {
-      setIsSwitchingOrganization(false);
+      await dispatch(switchTopbarOrganization(organizationId)).unwrap();
+      toast.success("Organization switched");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to switch organization";
+      toast.error(message);
     }
   };
 
@@ -130,40 +131,13 @@ export function Topbar() {
         : "Creating organization...";
     const toastId = toast.loading(loadingMessage);
 
-    setIsCreatingOrganization(true);
     try {
-      const response = await fetch("/api/me/organizations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to create organization";
-        try {
-          const errorData = (await response.json()) as { error?: string };
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch {
-          // Ignore parse errors and keep default message.
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = (await response.json()) as {
-        organization?: { name?: string };
-      };
-
+      const result = await dispatch(createTopbarOrganization(payload)).unwrap();
       setCreateOrganizationOpen(false);
       setScratchOrganizationName("");
-      await loadTopbarData();
-      router.refresh();
       toast.success(
-        result.organization?.name
-          ? `Organization "${result.organization.name}" created`
+        result.createdOrganizationName
+          ? `Organization "${result.createdOrganizationName}" created`
           : "Organization created successfully",
         { id: toastId },
       );
@@ -171,8 +145,6 @@ export function Topbar() {
       const message =
         error instanceof Error ? error.message : "Failed to create organization";
       toast.error(message, { id: toastId });
-    } finally {
-      setIsCreatingOrganization(false);
     }
   };
 
@@ -215,7 +187,6 @@ export function Topbar() {
     router.push("/notifications");
   };
 
-  // Open search with Ctrl+K
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
