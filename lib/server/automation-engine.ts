@@ -2,6 +2,7 @@ import type {
   AutomationAction,
   AutomationChangedField,
   AutomationCondition,
+  AutomationEntityType,
   AutomationRule,
   AutomationTriggerEvent,
 } from "@/lib/automation/types";
@@ -11,6 +12,12 @@ import { isMissingTableInSchemaCache } from "@/lib/tickets/errors";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type { OrganizationRole } from "@/lib/topbar/types";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets/types";
+import {
+  derivePaymentStatusFromOrderStatus,
+  isOrderPaymentStatus,
+  isOrderStatus,
+} from "@/lib/orders/validation";
+import type { OrderPaymentStatus, OrderStatus } from "@/lib/orders/types";
 import { getUniqueRecipientIds, insertAppNotifications } from "@/lib/server/notifications";
 import { writeAuditLog } from "@/lib/server/audit-logs";
 
@@ -33,6 +40,28 @@ export type TicketAutomationRow = {
   closed_at: string | null;
 };
 
+export type OrderAutomationRow = {
+  id: string;
+  organization_id: string;
+  customer_id: string;
+  order_number: string;
+  status: OrderStatus;
+  payment_status: OrderPaymentStatus;
+  currency: string;
+  subtotal_amount: number;
+  tax_amount: number;
+  discount_amount: number;
+  total_amount: number;
+  placed_at: string | null;
+  paid_at: string | null;
+  fulfilled_at: string | null;
+  cancelled_at: string | null;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type AutomationRuleRow = Omit<AutomationRule, "conditions" | "actions"> & {
   conditions: unknown;
   actions: unknown;
@@ -49,17 +78,21 @@ type MembershipFallbackRow = Omit<MembershipRow, "status">;
 const AUTOMATION_TRIGGER_EVENTS: AutomationTriggerEvent[] = [
   "ticket.created",
   "ticket.updated",
+  "order.created",
+  "order.updated",
 ];
 
 const AUTOMATION_CHANGED_FIELDS: AutomationChangedField[] = [
   "status",
   "priority",
   "assignee_id",
+  "payment_status",
 ];
 
 const DEFAULT_TICKET_AUTOMATION_RULES: Array<{
   name: string;
   description: string;
+  entity_type: AutomationEntityType;
   trigger_event: AutomationTriggerEvent;
   conditions: AutomationCondition;
   actions: AutomationAction[];
@@ -68,6 +101,7 @@ const DEFAULT_TICKET_AUTOMATION_RULES: Array<{
     name: "Urgent Unassigned Auto-Assign",
     description:
       "When an urgent ticket is created without an assignee, assign the first active manager and notify manager role.",
+    entity_type: "ticket",
     trigger_event: "ticket.created",
     conditions: {
       priorities: ["urgent"],
@@ -91,6 +125,41 @@ const DEFAULT_TICKET_AUTOMATION_RULES: Array<{
     ],
   },
 ];
+
+const DEFAULT_ORDER_AUTOMATION_RULES: Array<{
+  name: string;
+  description: string;
+  entity_type: AutomationEntityType;
+  trigger_event: AutomationTriggerEvent;
+  conditions: AutomationCondition;
+  actions: AutomationAction[];
+}> = [
+  {
+    name: "Pending Order Manager Alert",
+    description:
+      "When an order is created as pending, notify managers for manual review.",
+    entity_type: "order",
+    trigger_event: "order.created",
+    conditions: {
+      statuses: ["pending"],
+    },
+    actions: [
+      {
+        type: "notify_role",
+        role: "manager",
+        title: "Pending order created",
+        body: 'Order "{{title}}" requires manager review.',
+      },
+    ],
+  },
+];
+
+function getDefaultRulesByEntityType(entityType: AutomationEntityType) {
+  if (entityType === "order") {
+    return DEFAULT_ORDER_AUTOMATION_RULES;
+  }
+  return DEFAULT_TICKET_AUTOMATION_RULES;
+}
 
 function isMissingAutomationRulesTable(error: { message?: string } | null | undefined): boolean {
   const message = (error?.message ?? "").toLowerCase();
@@ -145,7 +214,16 @@ export function normalizeAutomationConditions(value: unknown): AutomationConditi
     : [];
 
   const statuses = Array.isArray(raw.statuses)
-    ? raw.statuses.filter((entry): entry is TicketStatus => isTicketStatus(entry))
+    ? raw.statuses.filter(
+        (entry): entry is TicketStatus | OrderStatus =>
+          isTicketStatus(entry) || isOrderStatus(entry),
+      )
+    : [];
+
+  const paymentStatuses = Array.isArray(raw.paymentStatuses)
+    ? raw.paymentStatuses.filter((entry): entry is OrderPaymentStatus =>
+        isOrderPaymentStatus(entry),
+      )
     : [];
 
   const changedFields = Array.isArray(raw.changedFields)
@@ -167,6 +245,9 @@ export function normalizeAutomationConditions(value: unknown): AutomationConditi
   }
   if (statuses.length > 0) {
     result.statuses = Array.from(new Set(statuses));
+  }
+  if (paymentStatuses.length > 0) {
+    result.paymentStatuses = Array.from(new Set(paymentStatuses));
   }
   if (changedFields.length > 0) {
     result.changedFields = Array.from(new Set(changedFields));
@@ -220,11 +301,11 @@ export function normalizeAutomationActions(value: unknown): AutomationAction[] {
     if (
       type === "set_status" &&
       typeof raw.status === "string" &&
-      isTicketStatus(raw.status)
+      (isTicketStatus(raw.status) || isOrderStatus(raw.status))
     ) {
       actions.push({
         type,
-        status: raw.status,
+        status: raw.status as TicketStatus | OrderStatus,
       });
       continue;
     }
@@ -237,6 +318,18 @@ export function normalizeAutomationActions(value: unknown): AutomationAction[] {
       actions.push({
         type,
         priority: raw.priority,
+      });
+      continue;
+    }
+
+    if (
+      type === "set_payment_status" &&
+      typeof raw.paymentStatus === "string" &&
+      isOrderPaymentStatus(raw.paymentStatus)
+    ) {
+      actions.push({
+        type,
+        paymentStatus: raw.paymentStatus,
       });
     }
   }
@@ -255,17 +348,27 @@ function normalizeAutomationRuleRow(row: AutomationRuleRow): AutomationRule {
 function renderTemplate(
   input: string,
   params: {
-    ticket: TicketAutomationRow;
+    entityType: AutomationEntityType;
+    row: TicketAutomationRow | OrderAutomationRow;
     rule: AutomationRule;
   },
 ): string {
-  const { ticket, rule } = params;
+  const { entityType, row, rule } = params;
+  const ticketRow = row as TicketAutomationRow;
+  const orderRow = row as OrderAutomationRow;
+  const title = entityType === "ticket" ? ticketRow.title : orderRow.order_number;
+  const status = row.status;
+  const priority = entityType === "ticket" ? ticketRow.priority : "";
+  const paymentStatus = entityType === "order" ? orderRow.payment_status : "";
+  const assigneeId = entityType === "ticket" ? (ticketRow.assignee_id ?? "unassigned") : "";
   return input
-    .replaceAll("{{ticketId}}", ticket.id)
-    .replaceAll("{{title}}", ticket.title)
-    .replaceAll("{{status}}", ticket.status)
-    .replaceAll("{{priority}}", ticket.priority)
-    .replaceAll("{{assigneeId}}", ticket.assignee_id ?? "unassigned")
+    .replaceAll("{{ticketId}}", row.id)
+    .replaceAll("{{orderId}}", row.id)
+    .replaceAll("{{title}}", title)
+    .replaceAll("{{status}}", status)
+    .replaceAll("{{priority}}", priority)
+    .replaceAll("{{paymentStatus}}", paymentStatus)
+    .replaceAll("{{assigneeId}}", assigneeId)
     .replaceAll("{{ruleName}}", rule.name);
 }
 
@@ -315,18 +418,28 @@ async function insertRuleRun(params: {
   supabase: SupabaseClient;
   organizationId: string;
   ruleId: string | null;
+  entityType: AutomationEntityType;
   entityId: string;
   triggerEvent: AutomationTriggerEvent;
   status: "executed" | "skipped" | "failed";
   details?: Record<string, unknown> | null;
 }): Promise<void> {
-  const { supabase, organizationId, ruleId, entityId, triggerEvent, status, details = null } =
+  const {
+    supabase,
+    organizationId,
+    ruleId,
+    entityType,
+    entityId,
+    triggerEvent,
+    status,
+    details = null,
+  } =
     params;
 
   const { error } = await supabase.from("automation_rule_runs").insert({
     organization_id: organizationId,
     rule_id: ruleId,
-    entity_type: "ticket",
+    entity_type: entityType,
     entity_id: entityId,
     trigger_event: triggerEvent,
     status,
@@ -345,13 +458,16 @@ async function insertRuleRun(params: {
 export async function ensureDefaultAutomationRules(
   supabase: SupabaseClient,
   organizationId: string,
+  entityType: AutomationEntityType,
   createdBy: string | null = null,
 ): Promise<void> {
+  const defaults = getDefaultRulesByEntityType(entityType);
+
   const { data, error } = await supabase
     .from("automation_rules")
     .select("id, name")
     .eq("organization_id", organizationId)
-    .eq("entity_type", "ticket")
+    .eq("entity_type", entityType)
     .returns<Array<{ id: string; name: string }>>();
 
   if (error) {
@@ -365,11 +481,11 @@ export async function ensureDefaultAutomationRules(
   }
 
   const existingNames = new Set((data ?? []).map((row) => row.name));
-  const rowsToInsert = DEFAULT_TICKET_AUTOMATION_RULES.filter(
+  const rowsToInsert = defaults.filter(
     (rule) => !existingNames.has(rule.name),
   ).map((rule) => ({
     organization_id: organizationId,
-    entity_type: "ticket",
+    entity_type: rule.entity_type,
     name: rule.name,
     description: rule.description,
     trigger_event: rule.trigger_event,
@@ -396,17 +512,25 @@ export async function ensureDefaultAutomationRules(
 export async function getAutomationRules(
   supabase: SupabaseClient,
   organizationId: string,
+  entityType: AutomationEntityType,
   seedUserId: string | null = null,
+  options: { includeArchived?: boolean } = {},
 ): Promise<AutomationRule[]> {
-  await ensureDefaultAutomationRules(supabase, organizationId, seedUserId);
+  await ensureDefaultAutomationRules(supabase, organizationId, entityType, seedUserId);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("automation_rules")
     .select(
-      "id, organization_id, entity_type, name, description, trigger_event, conditions, actions, is_enabled, created_by, created_at, updated_at",
+      "id, organization_id, entity_type, name, description, trigger_event, conditions, actions, is_enabled, archived_at, created_by, created_at, updated_at",
     )
     .eq("organization_id", organizationId)
-    .eq("entity_type", "ticket")
+    .eq("entity_type", entityType);
+
+  if (!options.includeArchived) {
+    query = query.is("archived_at", null);
+  }
+
+  const { data, error } = await query
     .order("created_at", { ascending: true })
     .returns<AutomationRuleRow[]>();
 
@@ -446,6 +570,10 @@ function matchesRuleCondition(params: {
     conditions.statuses.length > 0 &&
     !conditions.statuses.includes(ticketAfter.status)
   ) {
+    return false;
+  }
+
+  if (conditions.paymentStatuses && conditions.paymentStatuses.length > 0) {
     return false;
   }
 
@@ -542,6 +670,9 @@ async function applyTicketRule(params: {
     }
 
     if (action.type === "set_status") {
+      if (!isTicketStatus(action.status)) {
+        continue;
+      }
       if (workingTicket.status === action.status) {
         continue;
       }
@@ -583,8 +714,16 @@ async function applyTicketRule(params: {
         action.body?.trim() ||
         `Ticket "{{title}}" matched automation rule "{{ruleName}}" on ${triggerEvent}.`;
 
-      const title = renderTemplate(titleTemplate, { ticket: workingTicket, rule });
-      const body = renderTemplate(bodyTemplate, { ticket: workingTicket, rule });
+      const title = renderTemplate(titleTemplate, {
+        entityType: "ticket",
+        row: workingTicket,
+        rule,
+      });
+      const body = renderTemplate(bodyTemplate, {
+        entityType: "ticket",
+        row: workingTicket,
+        rule,
+      });
 
       await insertAppNotifications(
         supabase,
@@ -608,7 +747,11 @@ async function applyTicketRule(params: {
     }
 
     if (action.type === "add_comment") {
-      const message = renderTemplate(action.message, { ticket: workingTicket, rule }).trim();
+      const message = renderTemplate(action.message, {
+        entityType: "ticket",
+        row: workingTicket,
+        rule,
+      }).trim();
       if (!message) {
         continue;
       }
@@ -686,7 +829,12 @@ export async function runTicketAutomationEngine(params: {
     ticketAfter,
   } = params;
 
-  const rules = await getAutomationRules(supabase, organizationId, actorUserId);
+  const rules = await getAutomationRules(
+    supabase,
+    organizationId,
+    "ticket",
+    actorUserId,
+  );
   if (!rules.length) {
     return {
       ticket: ticketAfter,
@@ -738,6 +886,7 @@ export async function runTicketAutomationEngine(params: {
           supabase,
           organizationId,
           ruleId: rule.id,
+          entityType: "ticket",
           entityId: workingTicket.id,
           triggerEvent,
           status: "skipped",
@@ -754,6 +903,7 @@ export async function runTicketAutomationEngine(params: {
         supabase,
         organizationId,
         ruleId: rule.id,
+        entityType: "ticket",
         entityId: workingTicket.id,
         triggerEvent,
         status: "executed",
@@ -784,6 +934,7 @@ export async function runTicketAutomationEngine(params: {
         supabase,
         organizationId,
         ruleId: rule.id,
+        entityType: "ticket",
         entityId: workingTicket.id,
         triggerEvent,
         status: "failed",
@@ -798,6 +949,392 @@ export async function runTicketAutomationEngine(params: {
 
   return {
     ticket: workingTicket,
+    scanned: rules.length,
+    matched,
+    executed,
+    failed,
+  };
+}
+
+function matchesOrderRuleCondition(params: {
+  rule: AutomationRule;
+  triggerEvent: AutomationTriggerEvent;
+  orderBefore: OrderAutomationRow | null;
+  orderAfter: OrderAutomationRow;
+  changedFields: Set<AutomationChangedField>;
+}): boolean {
+  const { rule, triggerEvent, orderBefore, orderAfter, changedFields } = params;
+  const conditions = rule.conditions;
+
+  if (
+    conditions.statuses &&
+    conditions.statuses.length > 0 &&
+    !conditions.statuses.includes(orderAfter.status)
+  ) {
+    return false;
+  }
+
+  if (
+    conditions.paymentStatuses &&
+    conditions.paymentStatuses.length > 0 &&
+    !conditions.paymentStatuses.includes(orderAfter.payment_status)
+  ) {
+    return false;
+  }
+
+  if (conditions.priorities && conditions.priorities.length > 0) {
+    return false;
+  }
+
+  if (conditions.assigneeState && conditions.assigneeState !== "any") {
+    return false;
+  }
+
+  if (
+    triggerEvent === "order.updated" &&
+    conditions.changedFields &&
+    conditions.changedFields.length > 0
+  ) {
+    const hasMatchedChangedField = conditions.changedFields.some((field) =>
+      changedFields.has(field),
+    );
+    if (!hasMatchedChangedField) {
+      return false;
+    }
+  }
+
+  if (!orderBefore && triggerEvent === "order.updated") {
+    return false;
+  }
+
+  return true;
+}
+
+function computeOrderChangedFields(
+  orderBefore: OrderAutomationRow | null,
+  orderAfter: OrderAutomationRow,
+): Set<AutomationChangedField> {
+  const changedFields = new Set<AutomationChangedField>();
+  if (!orderBefore) {
+    return changedFields;
+  }
+
+  if (orderBefore.status !== orderAfter.status) {
+    changedFields.add("status");
+  }
+  if (orderBefore.payment_status !== orderAfter.payment_status) {
+    changedFields.add("payment_status");
+  }
+
+  return changedFields;
+}
+
+async function applyOrderRule(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId: string | null;
+  rule: AutomationRule;
+  triggerEvent: AutomationTriggerEvent;
+  order: OrderAutomationRow;
+}): Promise<{
+  order: OrderAutomationRow;
+  executedActions: Array<Record<string, unknown>>;
+}> {
+  const { supabase, organizationId, actorUserId, rule, triggerEvent } = params;
+  let workingOrder = { ...params.order };
+  const orderPatch: Partial<OrderAutomationRow> = {};
+  const executedActions: Array<Record<string, unknown>> = [];
+
+  for (const action of rule.actions) {
+    if (action.type === "set_status") {
+      if (!isOrderStatus(action.status)) {
+        continue;
+      }
+      if (workingOrder.status === action.status) {
+        continue;
+      }
+      const fromStatus = workingOrder.status;
+      orderPatch.status = action.status;
+      orderPatch.payment_status = derivePaymentStatusFromOrderStatus(action.status);
+      workingOrder.status = action.status;
+      workingOrder.payment_status = derivePaymentStatusFromOrderStatus(action.status);
+
+      const { error: statusEventError } = await supabase.from("order_status_events").insert({
+        organization_id: organizationId,
+        order_id: workingOrder.id,
+        from_status: fromStatus,
+        to_status: action.status,
+        actor_user_id: actorUserId,
+        reason: `Automation rule: ${rule.name}`,
+      });
+
+      if (statusEventError && !isMissingTableInSchemaCache(statusEventError, "order_status_events")) {
+        throw new Error(`Failed to write automation order status event: ${statusEventError.message}`);
+      }
+
+      executedActions.push({
+        type: action.type,
+        status: action.status,
+      });
+      continue;
+    }
+
+    if (action.type === "set_payment_status") {
+      if (workingOrder.payment_status === action.paymentStatus) {
+        continue;
+      }
+      orderPatch.payment_status = action.paymentStatus;
+      workingOrder.payment_status = action.paymentStatus;
+      executedActions.push({
+        type: action.type,
+        paymentStatus: action.paymentStatus,
+      });
+      continue;
+    }
+
+    if (action.type === "notify_role") {
+      const roleMembers = await loadRoleMemberIds({
+        supabase,
+        organizationId,
+        role: action.role,
+      });
+      const recipients = getUniqueRecipientIds(roleMembers, actorUserId ?? "__system__");
+      if (!recipients.length) {
+        continue;
+      }
+
+      const titleTemplate = action.title?.trim() || `Automation: ${rule.name}`;
+      const bodyTemplate =
+        action.body?.trim() ||
+        `Order "{{title}}" matched automation rule "{{ruleName}}" on ${triggerEvent}.`;
+
+      const title = renderTemplate(titleTemplate, {
+        entityType: "order",
+        row: workingOrder,
+        rule,
+      });
+      const body = renderTemplate(bodyTemplate, {
+        entityType: "order",
+        row: workingOrder,
+        rule,
+      });
+
+      await insertAppNotifications(
+        supabase,
+        recipients.map((recipientId) => ({
+          userId: recipientId,
+          organizationId,
+          type: "alert",
+          title,
+          body,
+          entityType: "order",
+          entityId: workingOrder.id,
+        })),
+      );
+
+      executedActions.push({
+        type: action.type,
+        role: action.role,
+        recipients: recipients.length,
+      });
+      continue;
+    }
+
+    if (action.type === "add_comment") {
+      const rendered = renderTemplate(action.message, {
+        entityType: "order",
+        row: workingOrder,
+        rule,
+      }).trim();
+      if (!rendered) {
+        continue;
+      }
+
+      const prefix = workingOrder.notes ? `${workingOrder.notes}\n` : "";
+      const nextNotes = `${prefix}[Automation] ${rendered}`.slice(0, 4000);
+      orderPatch.notes = nextNotes;
+      workingOrder.notes = nextNotes;
+
+      executedActions.push({
+        type: action.type,
+        message: rendered,
+      });
+      continue;
+    }
+  }
+
+  if (Object.keys(orderPatch).length > 0) {
+    const { data: updatedOrder, error: updateError } = await supabase
+      .from("orders")
+      .update(orderPatch)
+      .eq("organization_id", organizationId)
+      .eq("id", workingOrder.id)
+      .select(
+        "id, organization_id, customer_id, order_number, status, payment_status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, notes, created_by, created_at, updated_at",
+      )
+      .maybeSingle<OrderAutomationRow>();
+
+    if (updateError) {
+      if (isMissingTableInSchemaCache(updateError, "orders")) {
+        throw new Error("Automation engine cannot update order because table public.orders is missing");
+      }
+      throw new Error(`Failed to update order from automation rule: ${updateError.message}`);
+    }
+
+    if (updatedOrder) {
+      workingOrder = updatedOrder;
+    }
+  }
+
+  return {
+    order: workingOrder,
+    executedActions,
+  };
+}
+
+export async function runOrderAutomationEngine(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId?: string | null;
+  triggerEvent: "order.created" | "order.updated";
+  orderBefore?: OrderAutomationRow | null;
+  orderAfter: OrderAutomationRow;
+}): Promise<{
+  order: OrderAutomationRow;
+  scanned: number;
+  matched: number;
+  executed: number;
+  failed: number;
+}> {
+  const {
+    supabase,
+    organizationId,
+    actorUserId = null,
+    triggerEvent,
+    orderBefore = null,
+    orderAfter,
+  } = params;
+
+  const rules = await getAutomationRules(
+    supabase,
+    organizationId,
+    "order",
+    actorUserId,
+  );
+  if (!rules.length) {
+    return {
+      order: orderAfter,
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  const changedFields = computeOrderChangedFields(orderBefore, orderAfter);
+  let workingOrder = { ...orderAfter };
+  let matched = 0;
+  let executed = 0;
+  let failed = 0;
+
+  for (const rule of rules) {
+    if (!rule.is_enabled || rule.entity_type !== "order" || rule.trigger_event !== triggerEvent) {
+      continue;
+    }
+
+    const isMatch = matchesOrderRuleCondition({
+      rule,
+      triggerEvent,
+      orderBefore,
+      orderAfter: workingOrder,
+      changedFields,
+    });
+    if (!isMatch) {
+      continue;
+    }
+
+    matched += 1;
+
+    try {
+      const result = await applyOrderRule({
+        supabase,
+        organizationId,
+        actorUserId,
+        rule,
+        triggerEvent,
+        order: workingOrder,
+      });
+
+      workingOrder = result.order;
+      const executedActions = result.executedActions;
+      if (executedActions.length === 0) {
+        await insertRuleRun({
+          supabase,
+          organizationId,
+          ruleId: rule.id,
+          entityType: "order",
+          entityId: workingOrder.id,
+          triggerEvent,
+          status: "skipped",
+          details: {
+            reason: "matched_without_effect",
+          },
+        });
+        continue;
+      }
+
+      executed += 1;
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "order",
+        entityId: workingOrder.id,
+        triggerEvent,
+        status: "executed",
+        details: {
+          actions: executedActions,
+        },
+      });
+
+      await writeAuditLog({
+        supabase,
+        organizationId,
+        actorUserId,
+        action: "automation.rule.executed",
+        entityType: "order",
+        entityId: workingOrder.id,
+        details: {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          triggerEvent,
+          actions: executedActions,
+        },
+      });
+    } catch (error: unknown) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : "Unknown automation error";
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "order",
+        entityId: workingOrder.id,
+        triggerEvent,
+        status: "failed",
+        details: {
+          error: message,
+        },
+      });
+
+      console.error(`Automation rule failed (${rule.name}): ${message}`);
+    }
+  }
+
+  return {
+    order: workingOrder,
     scanned: rules.length,
     matched,
     executed,

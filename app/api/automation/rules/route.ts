@@ -6,7 +6,10 @@ import {
   normalizeAutomationActions,
   normalizeAutomationConditions,
 } from "@/lib/server/automation-engine";
-import type { AutomationRulesResponse } from "@/lib/automation/types";
+import type {
+  AutomationEntityType,
+  AutomationRulesResponse,
+} from "@/lib/automation/types";
 import type { OrganizationRole } from "@/lib/topbar/types";
 
 type MembershipRow = {
@@ -17,8 +20,10 @@ type MembershipRow = {
 type MembershipFallbackRow = Omit<MembershipRow, "status">;
 
 type UpsertRulesBody = {
+  entityType?: string;
   rules?: Array<{
     id?: string;
+    entityType?: string;
     name?: string;
     description?: string | null;
     triggerEvent?: string;
@@ -31,6 +36,20 @@ type UpsertRulesBody = {
 type ExistingRuleIdRow = {
   id: string;
 };
+
+function isAutomationEntityType(value: unknown): value is AutomationEntityType {
+  return value === "ticket" || value === "order";
+}
+
+function isTriggerCompatibleWithEntityType(
+  entityType: AutomationEntityType,
+  triggerEvent: string,
+): boolean {
+  if (entityType === "ticket") {
+    return triggerEvent === "ticket.created" || triggerEvent === "ticket.updated";
+  }
+  return triggerEvent === "order.created" || triggerEvent === "order.updated";
+}
 
 function normalizeName(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -101,7 +120,7 @@ async function resolveActorRole(params: {
   return fallback.data?.role ?? null;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const ctxResult = await getTicketRequestContext();
   if (!ctxResult.ok) {
     return NextResponse.json({ error: ctxResult.error }, { status: ctxResult.status });
@@ -115,7 +134,18 @@ export async function GET() {
     );
   }
 
-  const rules = await getAutomationRules(supabase, activeOrgId, userId);
+  const { searchParams } = new URL(req.url);
+  const entityTypeRaw = searchParams.get("entityType");
+  const entityType = isAutomationEntityType(entityTypeRaw) ? entityTypeRaw : "ticket";
+  const includeArchived = searchParams.get("includeArchived") === "true";
+
+  const rules = await getAutomationRules(
+    supabase,
+    activeOrgId,
+    entityType,
+    userId,
+    { includeArchived },
+  );
   const payload: AutomationRulesResponse = {
     activeOrgId,
     currentUserId: userId,
@@ -161,11 +191,15 @@ export async function PATCH(req: Request) {
     );
   }
 
+  const bodyEntityType = isAutomationEntityType(body.entityType)
+    ? body.entityType
+    : "ticket";
+
   const { data: existingRows, error: existingRowsError } = await supabase
     .from("automation_rules")
     .select("id")
     .eq("organization_id", activeOrgId)
-    .eq("entity_type", "ticket")
+    .eq("entity_type", bodyEntityType)
     .returns<ExistingRuleIdRow[]>();
 
   if (existingRowsError) {
@@ -187,6 +221,10 @@ export async function PATCH(req: Request) {
   const existingIds = new Set((existingRows ?? []).map((row) => row.id));
 
   for (const entry of inputRules) {
+    const entityType = isAutomationEntityType(entry?.entityType)
+      ? entry.entityType
+      : bodyEntityType;
+
     const name = normalizeName(entry?.name);
     if (!name) {
       return NextResponse.json(
@@ -198,6 +236,14 @@ export async function PATCH(req: Request) {
     if (!isAutomationTriggerEvent(entry?.triggerEvent)) {
       return NextResponse.json(
         { error: `Invalid triggerEvent for rule "${name}"` },
+        { status: 400 },
+      );
+    }
+    if (!isTriggerCompatibleWithEntityType(entityType, entry.triggerEvent)) {
+      return NextResponse.json(
+        {
+          error: `triggerEvent "${entry.triggerEvent}" is not valid for entity type "${entityType}"`,
+        },
         { status: 400 },
       );
     }
@@ -227,7 +273,7 @@ export async function PATCH(req: Request) {
           is_enabled: isEnabled,
         })
         .eq("organization_id", activeOrgId)
-        .eq("entity_type", "ticket")
+        .eq("entity_type", entityType)
         .eq("id", id);
 
       if (updateError) {
@@ -243,7 +289,7 @@ export async function PATCH(req: Request) {
       .from("automation_rules")
       .insert({
         organization_id: activeOrgId,
-        entity_type: "ticket",
+        entity_type: entityType,
         name,
         description,
         trigger_event: entry.triggerEvent,
@@ -261,7 +307,7 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const rules = await getAutomationRules(supabase, activeOrgId, userId);
+  const rules = await getAutomationRules(supabase, activeOrgId, bodyEntityType, userId);
   const payload: AutomationRulesResponse = {
     activeOrgId,
     currentUserId: userId,

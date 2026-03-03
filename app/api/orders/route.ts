@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import {
+  runOrderAutomationEngine,
+  type OrderAutomationRow,
+} from "@/lib/server/automation-engine";
 import type {
   OrderCustomer,
   OrderItem,
@@ -519,10 +523,23 @@ export async function POST(req: Request) {
       );
     }
 
+    let orderAfterAutomation: OrderRow = insertedOrder;
+    const automationResult = await runOrderAutomationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      triggerEvent: "order.created",
+      orderAfter: insertedOrder as OrderAutomationRow,
+    });
+    orderAfterAutomation = {
+      ...orderAfterAutomation,
+      ...automationResult.order,
+    };
+
     const { data: creatorData, error: creatorError } = await supabase
       .from("users")
       .select("id, name, email, avatar_url")
-      .eq("id", insertedOrder.created_by)
+      .eq("id", orderAfterAutomation.created_by)
       .maybeSingle<OrderUser>();
 
     if (creatorError) {
@@ -533,8 +550,8 @@ export async function POST(req: Request) {
     }
 
     const order: OrderListItem = {
-      ...insertedOrder,
-      currency: normalizeCurrencyForResponse(insertedOrder.currency),
+      ...orderAfterAutomation,
+      currency: normalizeCurrencyForResponse(orderAfterAutomation.currency),
       customer: customerData,
       creator: creatorData ?? null,
     };

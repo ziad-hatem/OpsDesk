@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/server/audit-logs";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import {
+  runOrderAutomationEngine,
+  type OrderAutomationRow,
+} from "@/lib/server/automation-engine";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
   OrderAttachment,
@@ -531,6 +535,20 @@ export async function PATCH(req: Request, context: RouteContext) {
       },
     });
   }
+
+  const orderAfterUpdate: OrderAutomationRow = {
+    ...existingOrder,
+    ...updatePayload,
+    updated_at: new Date().toISOString(),
+  };
+  await runOrderAutomationEngine({
+    supabase,
+    organizationId: activeOrgId,
+    actorUserId: userId,
+    triggerEvent: "order.updated",
+    orderBefore: existingOrder as OrderAutomationRow,
+    orderAfter: orderAfterUpdate,
+  });
 
   const detailResult = await buildOrderDetailResponse({
     supabase,

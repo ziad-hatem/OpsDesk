@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AlertTriangle,
   BarChart3,
   CalendarRange,
   LayoutDashboard,
@@ -30,6 +31,7 @@ const mainNavItems = [
   { title: "Tickets", href: "/tickets", icon: Ticket },
   { title: "Orders", href: "/orders", icon: ShoppingCart },
   { title: "Customers", href: "/customers", icon: Users },
+  { title: "Incidents", href: "/incidents", icon: AlertTriangle },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Calendar", href: "/calendar", icon: CalendarRange },
 ];

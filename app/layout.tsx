@@ -32,7 +32,10 @@ function LayoutShell({
     ? PUBLIC_AUTH_ROUTES.has(pathname)
     : false;
   const isInviteRoute = pathname ? pathname.startsWith("/invite/") : false;
-  const isPublicRoute = isPublicAuthRoute || isInviteRoute;
+  const isPortalRoute = pathname ? pathname.startsWith("/portal") : false;
+  const isPublicStatusRoute = pathname ? pathname.startsWith("/status/") : false;
+  const isPublicRoute =
+    isPublicAuthRoute || isInviteRoute || isPortalRoute || isPublicStatusRoute;
 
   useEffect(() => {
     if (status === "loading") {

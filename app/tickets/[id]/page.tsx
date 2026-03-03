@@ -46,6 +46,7 @@ import type {
   TicketTextWithAttachments,
   TicketUser,
 } from "@/lib/tickets/types";
+import { buildMentionHandlesForIdentity } from "@/lib/tickets/mention-handles";
 
 type CreateTextResponse = {
   text: TicketTextWithAttachments;
@@ -187,6 +188,49 @@ export default function TicketDetailPage() {
   const assignees = detail?.assignees ?? [];
   const systemActivity = texts.filter((text) => text.type === "system");
   const isLoading = detailEntry.status === "loading" && !detail;
+  const mentionableUsers = useMemo(() => {
+    const usersById = new Map<string, TicketUser>();
+    for (const user of assignees) {
+      usersById.set(user.id, user);
+    }
+    if (ticket?.creator) {
+      usersById.set(ticket.creator.id, ticket.creator);
+    }
+
+    return Array.from(usersById.values())
+      .map((user) => ({
+        user,
+        handles: buildMentionHandlesForIdentity({
+          name: user.name,
+          email: user.email,
+        }),
+      }))
+      .filter((entry) => entry.handles.length > 0)
+      .sort((a, b) => formatUserDisplay(a.user).localeCompare(formatUserDisplay(b.user)));
+  }, [assignees, ticket?.creator]);
+  const activeMentionQuery = useMemo(() => {
+    const match = reply.match(/(^|[\s([{\-])@([a-zA-Z0-9._-]*)$/);
+    if (!match) {
+      return null;
+    }
+    return (match[2] ?? "").toLowerCase();
+  }, [reply]);
+  const mentionSuggestions = useMemo(() => {
+    if (activeMentionQuery === null) {
+      return [];
+    }
+
+    return mentionableUsers
+      .map((entry) => ({
+        ...entry,
+        handles: entry.handles.filter(
+          (handle) =>
+            activeMentionQuery.length === 0 ||
+            handle.toLowerCase().startsWith(activeMentionQuery),
+        ),
+      }))
+      .filter((entry) => entry.handles.length > 0);
+  }, [activeMentionQuery, mentionableUsers]);
 
   useEffect(() => {
     if (!ticket) {
@@ -232,6 +276,24 @@ export default function TicketDetailPage() {
 
   const handleRemoveSelectedFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== index));
+  };
+
+  const handleInsertMention = (handle: string) => {
+    setReply((prev) => {
+      const match = prev.match(/(^|[\s([{\-])@([a-zA-Z0-9._-]*)$/);
+      if (!match) {
+        const trimmed = prev.trimEnd();
+        if (!trimmed) {
+          return `@${handle} `;
+        }
+        return `${trimmed} @${handle} `;
+      }
+
+      const delimiter = match[1] ?? "";
+      const wholeMatch = match[0] ?? "";
+      const prefix = prev.slice(0, prev.length - wholeMatch.length);
+      return `${prefix}${delimiter}@${handle} `;
+    });
   };
 
   const runTicketUpdate = async (
@@ -580,6 +642,38 @@ export default function TicketDetailPage() {
                   onChange={(event) => setReply(event.target.value)}
                   className="min-h-[120px]"
                 />
+                {activeMentionQuery !== null ? (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-xs font-medium text-slate-700">
+                      Mention handles on this ticket
+                    </p>
+                    {mentionSuggestions.length === 0 ? (
+                      <p className="mt-1 text-xs text-slate-500">No matching handles found.</p>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        {mentionSuggestions.map((entry) => (
+                          <div key={entry.user.id} className="space-y-1">
+                            <p className="text-xs text-slate-600">
+                              {formatUserDisplay(entry.user)}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {entry.handles.map((handle) => (
+                                <button
+                                  key={`${entry.user.id}-${handle}`}
+                                  type="button"
+                                  onClick={() => handleInsertMention(handle)}
+                                  className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-700 hover:bg-slate-100"
+                                >
+                                  @{handle}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
 
                 {selectedFiles.length > 0 && (
                   <div className="space-y-2">

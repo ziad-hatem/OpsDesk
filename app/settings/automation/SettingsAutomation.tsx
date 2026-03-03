@@ -1,12 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/app/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -20,6 +30,7 @@ import type {
   AutomationAction,
   AutomationAssigneeState,
   AutomationChangedField,
+  AutomationEntityType,
   AutomationRule,
   AutomationRulesResponse,
   AutomationTriggerEvent,
@@ -28,20 +39,25 @@ import { useAppSelector } from "@/lib/store/hooks";
 import { selectTopbarActiveOrganizationId } from "@/lib/store/slices/topbar-slice";
 import type { OrganizationRole } from "@/lib/topbar/types";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets/types";
+import type { OrderPaymentStatus, OrderStatus } from "@/lib/orders/types";
 
 type RulePriority = "any" | TicketPriority;
-type RuleStatus = "any" | TicketStatus;
+type RuleStatus = "any" | TicketStatus | OrderStatus;
+type RulePaymentStatus = "any" | OrderPaymentStatus;
 type RuleChangedField = "any" | AutomationChangedField;
 type RuleRole = "none" | OrganizationRole;
 
 type EditableRule = {
   id?: string;
+  entityType: AutomationEntityType;
+  isArchived: boolean;
   name: string;
   description: string;
   triggerEvent: AutomationTriggerEvent;
   isEnabled: boolean;
   priority: RulePriority;
   status: RuleStatus;
+  paymentStatus: RulePaymentStatus;
   assigneeState: AutomationAssigneeState;
   changedField: RuleChangedField;
   assignRole: RuleRole;
@@ -49,21 +65,67 @@ type EditableRule = {
   notifyTitle: string;
   notifyBody: string;
   comment: string;
-  setStatus: "none" | TicketStatus;
+  setStatus: "none" | TicketStatus | OrderStatus;
   setPriority: "none" | TicketPriority;
+  setPaymentStatus: "none" | OrderPaymentStatus;
 };
 
 const PRIORITY_OPTIONS: RulePriority[] = ["any", "urgent", "high", "medium", "low"];
 const STATUS_OPTIONS: RuleStatus[] = ["any", "open", "pending", "resolved", "closed"];
 const CHANGED_FIELD_OPTIONS: RuleChangedField[] = ["any", "status", "priority", "assignee_id"];
+const ORDER_STATUS_OPTIONS: RuleStatus[] = [
+  "any",
+  "draft",
+  "pending",
+  "paid",
+  "fulfilled",
+  "cancelled",
+  "refunded",
+];
+const TICKET_CHANGED_FIELD_OPTIONS: RuleChangedField[] = [
+  "any",
+  "status",
+  "priority",
+  "assignee_id",
+];
+const ORDER_CHANGED_FIELD_OPTIONS: RuleChangedField[] = ["any", "status", "payment_status"];
+const ORDER_PAYMENT_STATUS_OPTIONS: RulePaymentStatus[] = [
+  "any",
+  "unpaid",
+  "payment_link_sent",
+  "paid",
+  "failed",
+  "refunded",
+  "expired",
+  "cancelled",
+];
 const ROLE_OPTIONS: RuleRole[] = ["none", "admin", "manager", "support", "read_only"];
 const ACTION_STATUS_OPTIONS: Array<"none" | TicketStatus> = ["none", "open", "pending", "resolved", "closed"];
+const ORDER_ACTION_STATUS_OPTIONS: Array<"none" | OrderStatus> = [
+  "none",
+  "draft",
+  "pending",
+  "paid",
+  "fulfilled",
+  "cancelled",
+  "refunded",
+];
 const ACTION_PRIORITY_OPTIONS: Array<"none" | TicketPriority> = [
   "none",
   "urgent",
   "high",
   "medium",
   "low",
+];
+const ACTION_PAYMENT_STATUS_OPTIONS: Array<"none" | OrderPaymentStatus> = [
+  "none",
+  "unpaid",
+  "payment_link_sent",
+  "paid",
+  "failed",
+  "refunded",
+  "expired",
+  "cancelled",
 ];
 
 function toLabel(value: string): string {
@@ -73,14 +135,21 @@ function toLabel(value: string): string {
     .join(" ");
 }
 
-function emptyRule(): EditableRule {
+function defaultTriggerForEntity(entityType: AutomationEntityType): AutomationTriggerEvent {
+  return entityType === "order" ? "order.created" : "ticket.created";
+}
+
+function emptyRule(entityType: AutomationEntityType): EditableRule {
   return {
+    entityType,
+    isArchived: false,
     name: "",
     description: "",
-    triggerEvent: "ticket.created",
+    triggerEvent: defaultTriggerForEntity(entityType),
     isEnabled: true,
     priority: "any",
     status: "any",
+    paymentStatus: "any",
     assigneeState: "any",
     changedField: "any",
     assignRole: "none",
@@ -90,6 +159,7 @@ function emptyRule(): EditableRule {
     comment: "",
     setStatus: "none",
     setPriority: "none",
+    setPaymentStatus: "none",
   };
 }
 
@@ -114,15 +184,22 @@ function fromRule(rule: AutomationRule): EditableRule {
     (action): action is Extract<AutomationAction, { type: "set_priority" }> =>
       action.type === "set_priority",
   );
+  const setPaymentStatusAction = rule.actions.find(
+    (action): action is Extract<AutomationAction, { type: "set_payment_status" }> =>
+      action.type === "set_payment_status",
+  );
 
   return {
     id: rule.id,
+    entityType: rule.entity_type,
+    isArchived: Boolean(rule.archived_at),
     name: rule.name,
     description: rule.description ?? "",
     triggerEvent: rule.trigger_event,
     isEnabled: rule.is_enabled,
     priority: rule.conditions.priorities?.[0] ?? "any",
     status: rule.conditions.statuses?.[0] ?? "any",
+    paymentStatus: rule.conditions.paymentStatuses?.[0] ?? "any",
     assigneeState: rule.conditions.assigneeState ?? "any",
     changedField: rule.conditions.changedFields?.[0] ?? "any",
     assignRole: assignRoleAction?.role ?? "none",
@@ -132,18 +209,22 @@ function fromRule(rule: AutomationRule): EditableRule {
     comment: addCommentAction?.message ?? "",
     setStatus: setStatusAction?.status ?? "none",
     setPriority: setPriorityAction?.priority ?? "none",
+    setPaymentStatus: setPaymentStatusAction?.paymentStatus ?? "none",
   };
 }
 
 function toApiRule(rule: EditableRule) {
   const conditions: Record<string, unknown> = {};
-  if (rule.priority !== "any") {
+  if (rule.entityType === "ticket" && rule.priority !== "any") {
     conditions.priorities = [rule.priority];
   }
   if (rule.status !== "any") {
     conditions.statuses = [rule.status];
   }
-  if (rule.assigneeState !== "any") {
+  if (rule.entityType === "order" && rule.paymentStatus !== "any") {
+    conditions.paymentStatuses = [rule.paymentStatus];
+  }
+  if (rule.entityType === "ticket" && rule.assigneeState !== "any") {
     conditions.assigneeState = rule.assigneeState;
   }
   if (rule.changedField !== "any") {
@@ -151,7 +232,7 @@ function toApiRule(rule: EditableRule) {
   }
 
   const actions: AutomationAction[] = [];
-  if (rule.assignRole !== "none") {
+  if (rule.entityType === "ticket" && rule.assignRole !== "none") {
     actions.push({
       type: "assign_role",
       role: rule.assignRole,
@@ -177,15 +258,22 @@ function toApiRule(rule: EditableRule) {
       status: rule.setStatus,
     });
   }
-  if (rule.setPriority !== "none") {
+  if (rule.entityType === "ticket" && rule.setPriority !== "none") {
     actions.push({
       type: "set_priority",
       priority: rule.setPriority,
     });
   }
+  if (rule.entityType === "order" && rule.setPaymentStatus !== "none") {
+    actions.push({
+      type: "set_payment_status",
+      paymentStatus: rule.setPaymentStatus,
+    });
+  }
 
   return {
     id: rule.id,
+    entityType: rule.entityType,
     name: rule.name.trim(),
     description: rule.description.trim() || null,
     triggerEvent: rule.triggerEvent,
@@ -210,7 +298,13 @@ async function readApiError(response: Response): Promise<string> {
 export default function SettingsAutomation() {
   const activeOrgId = useAppSelector(selectTopbarActiveOrganizationId);
 
+  const [selectedEntityType, setSelectedEntityType] = useState<AutomationEntityType>("ticket");
+  const [showArchived, setShowArchived] = useState(false);
   const [rules, setRules] = useState<EditableRule[]>([]);
+  const [deleteTargetRule, setDeleteTargetRule] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [isDeletingRule, setIsDeletingRule] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -223,10 +317,13 @@ export default function SettingsAutomation() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/automation/rules", {
+      const response = await fetch(
+        `/api/automation/rules?entityType=${selectedEntityType}&includeArchived=${showArchived ? "true" : "false"}`,
+        {
         method: "GET",
         cache: "no-store",
-      });
+        },
+      );
       if (!response.ok) {
         throw new Error(await readApiError(response));
       }
@@ -241,7 +338,7 @@ export default function SettingsAutomation() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeOrgId]);
+  }, [activeOrgId, selectedEntityType, showArchived]);
 
   useEffect(() => {
     void loadRules();
@@ -286,6 +383,7 @@ export default function SettingsAutomation() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          entityType: selectedEntityType,
           rules: rules.map(toApiRule),
         }),
       });
@@ -301,6 +399,53 @@ export default function SettingsAutomation() {
       toast.error(message, { id: toastId });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleArchiveToggle = async (ruleId: string, archived: boolean) => {
+    const toastId = toast.loading(archived ? "Archiving rule..." : "Restoring rule...");
+    try {
+      const response = await fetch(`/api/automation/rules/${ruleId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ archived }),
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+      toast.success(archived ? "Rule archived" : "Rule restored", { id: toastId });
+      await loadRules();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update rule archive state";
+      toast.error(message, { id: toastId });
+    }
+  };
+
+  const handleDeleteRule = async () => {
+    if (!deleteTargetRule || isDeletingRule) {
+      return;
+    }
+
+    setIsDeletingRule(true);
+    const toastId = toast.loading("Deleting rule...");
+    try {
+      const response = await fetch(`/api/automation/rules/${deleteTargetRule.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+      setRules((prev) => prev.filter((rule) => rule.id !== deleteTargetRule.id));
+      setDeleteTargetRule(null);
+      toast.success("Rule deleted", { id: toastId });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to delete rule";
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsDeletingRule(false);
     }
   };
 
@@ -329,9 +474,31 @@ export default function SettingsAutomation() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select
+            value={selectedEntityType}
+            onValueChange={(value) => {
+              setSelectedEntityType(value as AutomationEntityType);
+              setRules([]);
+            }}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ticket">Ticket Rules</SelectItem>
+              <SelectItem value="order">Order Rules</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center rounded-md border border-slate-200 px-3 py-2">
+            <Switch
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+            />
+            <span className="ml-2 text-sm text-slate-600">Show archived</span>
+          </div>
           <Button
             variant="outline"
-            onClick={() => setRules((prev) => [...prev, emptyRule()])}
+            onClick={() => setRules((prev) => [...prev, emptyRule(selectedEntityType)])}
             className="gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -368,10 +535,65 @@ export default function SettingsAutomation() {
           {rules.map((rule, index) => (
             <Card key={rule.id ?? `new-${index}`}>
               <CardHeader>
-                <CardTitle>Rule {index + 1}</CardTitle>
-                <CardDescription>
-                  Define trigger, conditions, and actions for this workflow rule.
-                </CardDescription>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle>Rule {index + 1}</CardTitle>
+                    <CardDescription>
+                      Define trigger, conditions, and actions for this workflow rule.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {rule.id ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => void handleArchiveToggle(rule.id!, !rule.isArchived)}
+                        >
+                          {rule.isArchived ? (
+                            <>
+                              <ArchiveRestore className="h-3.5 w-3.5" />
+                              Restore
+                            </>
+                          ) : (
+                            <>
+                              <Archive className="h-3.5 w-3.5" />
+                              Archive
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-red-600 hover:text-red-700"
+                          onClick={() =>
+                            setDeleteTargetRule({
+                              id: rule.id!,
+                              name: rule.name.trim() || `Rule ${index + 1}`,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setRules((prev) => prev.filter((_, rowIndex) => rowIndex !== index))
+                        }
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -426,8 +648,17 @@ export default function SettingsAutomation() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ticket.created">Ticket Created</SelectItem>
-                        <SelectItem value="ticket.updated">Ticket Updated</SelectItem>
+                        {rule.entityType === "ticket" ? (
+                          <>
+                            <SelectItem value="ticket.created">Ticket Created</SelectItem>
+                            <SelectItem value="ticket.updated">Ticket Updated</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="order.created">Order Created</SelectItem>
+                            <SelectItem value="order.updated">Order Updated</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -469,7 +700,10 @@ export default function SettingsAutomation() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CHANGED_FIELD_OPTIONS.map((option) => (
+                        {(rule.entityType === "ticket"
+                          ? TICKET_CHANGED_FIELD_OPTIONS
+                          : ORDER_CHANGED_FIELD_OPTIONS
+                        ).map((option) => (
                           <SelectItem key={option} value={option}>
                             {option === "any" ? "Any field" : toLabel(option)}
                           </SelectItem>
@@ -480,32 +714,61 @@ export default function SettingsAutomation() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>Condition: Priority</Label>
-                    <Select
-                      value={rule.priority}
-                      onValueChange={(value) =>
-                        setRules((prev) =>
-                          prev.map((entry, entryIndex) =>
-                            entryIndex === index
-                              ? { ...entry, priority: value as RulePriority }
-                              : entry,
-                          ),
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRIORITY_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option === "any" ? "Any priority" : toLabel(option)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {rule.entityType === "ticket" ? (
+                    <div className="space-y-2">
+                      <Label>Condition: Priority</Label>
+                      <Select
+                        value={rule.priority}
+                        onValueChange={(value) =>
+                          setRules((prev) =>
+                            prev.map((entry, entryIndex) =>
+                              entryIndex === index
+                                ? { ...entry, priority: value as RulePriority }
+                                : entry,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRIORITY_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option === "any" ? "Any priority" : toLabel(option)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Condition: Payment Status</Label>
+                      <Select
+                        value={rule.paymentStatus}
+                        onValueChange={(value) =>
+                          setRules((prev) =>
+                            prev.map((entry, entryIndex) =>
+                              entryIndex === index
+                                ? { ...entry, paymentStatus: value as RulePaymentStatus }
+                                : entry,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ORDER_PAYMENT_STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option === "any" ? "Any payment status" : toLabel(option)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Condition: Status</Label>
@@ -525,68 +788,88 @@ export default function SettingsAutomation() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {STATUS_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option === "any" ? "Any status" : toLabel(option)}
-                          </SelectItem>
-                        ))}
+                        {(rule.entityType === "ticket" ? STATUS_OPTIONS : ORDER_STATUS_OPTIONS).map(
+                          (option) => (
+                            <SelectItem key={option} value={option}>
+                              {option === "any" ? "Any status" : toLabel(option)}
+                            </SelectItem>
+                          ),
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Condition: Assignee</Label>
-                    <Select
-                      value={rule.assigneeState}
-                      onValueChange={(value) =>
-                        setRules((prev) =>
-                          prev.map((entry, entryIndex) =>
-                            entryIndex === index
-                              ? { ...entry, assigneeState: value as AutomationAssigneeState }
-                              : entry,
-                          ),
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">Any</SelectItem>
-                        <SelectItem value="assigned">Assigned</SelectItem>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {rule.entityType === "ticket" ? (
+                    <div className="space-y-2">
+                      <Label>Condition: Assignee</Label>
+                      <Select
+                        value={rule.assigneeState}
+                        onValueChange={(value) =>
+                          setRules((prev) =>
+                            prev.map((entry, entryIndex) =>
+                              entryIndex === index
+                                ? { ...entry, assigneeState: value as AutomationAssigneeState }
+                                : entry,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">Any</SelectItem>
+                          <SelectItem value="assigned">Assigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Condition: Assignee</Label>
+                      <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                        Not applicable for orders
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label>Action: Assign Role</Label>
-                    <Select
-                      value={rule.assignRole}
-                      onValueChange={(value) =>
-                        setRules((prev) =>
-                          prev.map((entry, entryIndex) =>
-                            entryIndex === index
-                              ? { ...entry, assignRole: value as RuleRole }
-                              : entry,
-                          ),
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ROLE_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option === "none" ? "No assignment" : toLabel(option)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {rule.entityType === "ticket" ? (
+                    <div className="space-y-2">
+                      <Label>Action: Assign Role</Label>
+                      <Select
+                        value={rule.assignRole}
+                        onValueChange={(value) =>
+                          setRules((prev) =>
+                            prev.map((entry, entryIndex) =>
+                              entryIndex === index
+                                ? { ...entry, assignRole: value as RuleRole }
+                                : entry,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLE_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option === "none" ? "No assignment" : toLabel(option)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Action: Assign Role</Label>
+                      <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                        Not applicable for orders
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Action: Notify Role</Label>
@@ -623,7 +906,7 @@ export default function SettingsAutomation() {
                         setRules((prev) =>
                           prev.map((entry, entryIndex) =>
                             entryIndex === index
-                              ? { ...entry, setStatus: value as "none" | TicketStatus }
+                              ? { ...entry, setStatus: value as "none" | TicketStatus | OrderStatus }
                               : entry,
                           ),
                         )
@@ -633,7 +916,10 @@ export default function SettingsAutomation() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {ACTION_STATUS_OPTIONS.map((option) => (
+                        {(rule.entityType === "ticket"
+                          ? ACTION_STATUS_OPTIONS
+                          : ORDER_ACTION_STATUS_OPTIONS
+                        ).map((option) => (
                           <SelectItem key={option} value={option}>
                             {option === "none" ? "No status change" : toLabel(option)}
                           </SelectItem>
@@ -643,30 +929,64 @@ export default function SettingsAutomation() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Action: Set Priority</Label>
-                    <Select
-                      value={rule.setPriority}
-                      onValueChange={(value) =>
-                        setRules((prev) =>
-                          prev.map((entry, entryIndex) =>
-                            entryIndex === index
-                              ? { ...entry, setPriority: value as "none" | TicketPriority }
-                              : entry,
-                          ),
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ACTION_PRIORITY_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option === "none" ? "No priority change" : toLabel(option)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {rule.entityType === "ticket" ? (
+                      <>
+                        <Label>Action: Set Priority</Label>
+                        <Select
+                          value={rule.setPriority}
+                          onValueChange={(value) =>
+                            setRules((prev) =>
+                              prev.map((entry, entryIndex) =>
+                                entryIndex === index
+                                  ? { ...entry, setPriority: value as "none" | TicketPriority }
+                                  : entry,
+                              ),
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ACTION_PRIORITY_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option === "none" ? "No priority change" : toLabel(option)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      <>
+                        <Label>Action: Set Payment</Label>
+                        <Select
+                          value={rule.setPaymentStatus}
+                          onValueChange={(value) =>
+                            setRules((prev) =>
+                              prev.map((entry, entryIndex) =>
+                                entryIndex === index
+                                  ? {
+                                      ...entry,
+                                      setPaymentStatus: value as "none" | OrderPaymentStatus,
+                                    }
+                                  : entry,
+                              ),
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ACTION_PAYMENT_STATUS_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option === "none" ? "No payment change" : toLabel(option)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -687,7 +1007,7 @@ export default function SettingsAutomation() {
                       }
                     />
                     <p className="text-xs text-slate-500">
-                      Supports: {"{{title}}"}, {"{{ticketId}}"}, {"{{priority}}"}, {"{{status}}"}, {"{{ruleName}}"}.
+                      Supports: {"{{title}}"}, {"{{ticketId}}"}, {"{{orderId}}"}, {"{{priority}}"}, {"{{status}}"}, {"{{paymentStatus}}"}, {"{{ruleName}}"}.
                     </p>
                   </div>
 
@@ -710,10 +1030,14 @@ export default function SettingsAutomation() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>System Comment Template</Label>
+                  <Label>{rule.entityType === "ticket" ? "System Comment Template" : "Order Note Template"}</Label>
                   <Input
                     value={rule.comment}
-                    placeholder="Automation applied: assigned to manager."
+                    placeholder={
+                      rule.entityType === "ticket"
+                        ? "Automation applied: assigned to manager."
+                        : "Automation note: manager notified for order review."
+                    }
                     onChange={(event) =>
                       setRules((prev) =>
                         prev.map((entry, entryIndex) =>
@@ -728,6 +1052,48 @@ export default function SettingsAutomation() {
           ))}
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(deleteTargetRule)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingRule) {
+            setDeleteTargetRule(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete automation rule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-slate-900">
+                {deleteTargetRule?.name ?? "this rule"}
+              </span>
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingRule}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteRule();
+              }}
+              disabled={isDeletingRule}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeletingRule ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </span>
+              ) : (
+                "Delete rule"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

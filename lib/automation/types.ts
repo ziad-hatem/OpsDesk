@@ -1,14 +1,24 @@
 import type { OrganizationRole } from "@/lib/topbar/types";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets/types";
+import type { OrderPaymentStatus, OrderStatus } from "@/lib/orders/types";
 
-export type AutomationEntityType = "ticket";
-export type AutomationTriggerEvent = "ticket.created" | "ticket.updated";
+export type AutomationEntityType = "ticket" | "order";
+export type AutomationTriggerEvent =
+  | "ticket.created"
+  | "ticket.updated"
+  | "order.created"
+  | "order.updated";
 export type AutomationAssigneeState = "any" | "assigned" | "unassigned";
-export type AutomationChangedField = "status" | "priority" | "assignee_id";
+export type AutomationChangedField =
+  | "status"
+  | "priority"
+  | "assignee_id"
+  | "payment_status";
 
 export type AutomationCondition = {
   priorities?: TicketPriority[];
-  statuses?: TicketStatus[];
+  statuses?: Array<TicketStatus | OrderStatus>;
+  paymentStatuses?: OrderPaymentStatus[];
   assigneeState?: AutomationAssigneeState;
   changedFields?: AutomationChangedField[];
 };
@@ -30,11 +40,15 @@ export type AutomationAction =
     }
   | {
       type: "set_status";
-      status: TicketStatus;
+      status: TicketStatus | OrderStatus;
     }
   | {
       type: "set_priority";
       priority: TicketPriority;
+    }
+  | {
+      type: "set_payment_status";
+      paymentStatus: OrderPaymentStatus;
     };
 
 export interface AutomationRule {
@@ -47,6 +61,7 @@ export interface AutomationRule {
   conditions: AutomationCondition;
   actions: AutomationAction[];
   is_enabled: boolean;
+  archived_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

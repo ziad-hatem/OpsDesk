@@ -5,6 +5,7 @@ import {
   getUniqueRecipientIds,
   insertAppNotifications,
 } from "@/lib/server/notifications";
+import { resolveMentionedOrgUserIds } from "@/lib/server/text-mentions";
 import type { TicketTextType, TicketTextWithAttachments, TicketUser } from "@/lib/tickets/types";
 import { isTicketTextType } from "@/lib/tickets/validation";
 import {
@@ -42,6 +43,13 @@ function normalizeTicketTextType(value: unknown): TicketTextType {
     return "comment";
   }
   return isTicketTextType(value) ? value : "comment";
+}
+
+function formatAuthorDisplay(author: TicketUser | null): string {
+  if (!author) {
+    return "Someone";
+  }
+  return author.name?.trim() || author.email;
 }
 
 export async function POST(req: Request, context: RouteContext) {
@@ -150,8 +158,8 @@ export async function POST(req: Request, context: RouteContext) {
     [ticketRow.created_by, ticketRow.assignee_id],
     userId,
   );
+  const preview = content.length > 120 ? `${content.slice(0, 117)}...` : content;
   if (recipients.length > 0) {
-    const preview = content.length > 120 ? `${content.slice(0, 117)}...` : content;
     const title = type === "internal_note"
       ? "New internal note on ticket"
       : "New comment on ticket";
@@ -163,6 +171,28 @@ export async function POST(req: Request, context: RouteContext) {
         type: "comment",
         title,
         body: `${ticketRow.title}: ${preview}`,
+        entityType: "ticket",
+        entityId: ticketId,
+      })),
+    );
+  }
+
+  const mentionedUserIds = await resolveMentionedOrgUserIds({
+    supabase,
+    organizationId: activeOrgId,
+    textBody: content,
+    excludeUserIds: [userId, ...recipients],
+  });
+  if (mentionedUserIds.length > 0) {
+    const mentionAuthor = formatAuthorDisplay(author ?? null);
+    await insertAppNotifications(
+      supabase,
+      mentionedUserIds.map((recipientId) => ({
+        userId: recipientId,
+        organizationId: activeOrgId,
+        type: "comment",
+        title: "You were mentioned in a ticket",
+        body: `${mentionAuthor} mentioned you in "${ticketRow.title}": ${preview}`,
         entityType: "ticket",
         entityId: ticketId,
       })),
