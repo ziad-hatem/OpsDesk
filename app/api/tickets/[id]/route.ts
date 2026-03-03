@@ -5,6 +5,10 @@ import {
   getSlaPolicyByPriority,
   runSlaEscalationEngine,
 } from "@/lib/server/sla-engine";
+import {
+  runTicketAutomationEngine,
+  type TicketAutomationRow,
+} from "@/lib/server/automation-engine";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -830,6 +834,21 @@ export async function PATCH(req: Request, context: RouteContext) {
         },
       });
     }
+
+    const ticketAfterUpdate: TicketAutomationRow = {
+      ...existingTicket,
+      ...updatePayload,
+      assignee_id: effectiveAssigneeId,
+      updated_at: new Date().toISOString(),
+    };
+    await runTicketAutomationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      triggerEvent: "ticket.updated",
+      ticketBefore: existingTicket as TicketAutomationRow,
+      ticketAfter: ticketAfterUpdate,
+    });
 
     await runSlaEscalationEngine({
       supabase,

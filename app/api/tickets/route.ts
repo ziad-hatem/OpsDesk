@@ -6,6 +6,10 @@ import {
   runSlaEscalationEngine,
 } from "@/lib/server/sla-engine";
 import {
+  runTicketAutomationEngine,
+  type TicketAutomationRow,
+} from "@/lib/server/automation-engine";
+import {
   getUniqueRecipientIds,
   insertAppNotifications,
 } from "@/lib/server/notifications";
@@ -671,7 +675,20 @@ export async function POST(req: Request) {
       body: "Ticket created",
     });
 
-    const userIds = [insertedTicket.created_by, insertedTicket.assignee_id]
+    let ticketAfterAutomation: TicketRow = insertedTicket;
+    const automationResult = await runTicketAutomationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      triggerEvent: "ticket.created",
+      ticketAfter: insertedTicket as TicketAutomationRow,
+    });
+    ticketAfterAutomation = {
+      ...ticketAfterAutomation,
+      ...automationResult.ticket,
+    };
+
+    const userIds = [ticketAfterAutomation.created_by, ticketAfterAutomation.assignee_id]
       .filter(Boolean)
       .map((id) => id as string);
     const { data: users } = await supabase
@@ -682,11 +699,11 @@ export async function POST(req: Request) {
 
     const usersById = new Map((users ?? []).map((user) => [user.id, user]));
     let customer: TicketCustomer | null = null;
-    if (insertedTicket.customer_id) {
+    if (ticketAfterAutomation.customer_id) {
       const { data: customerData, error: customerError } = await supabase
         .from("customers")
         .select("id, name, email")
-        .eq("id", insertedTicket.customer_id)
+        .eq("id", ticketAfterAutomation.customer_id)
         .eq("organization_id", activeOrgId)
         .maybeSingle<CustomerRow>();
 
@@ -706,30 +723,30 @@ export async function POST(req: Request) {
     }
 
     const ticket: TicketListItem = {
-      ...insertedTicket,
-      assignee: insertedTicket.assignee_id
-        ? usersById.get(insertedTicket.assignee_id) ?? null
+      ...ticketAfterAutomation,
+      assignee: ticketAfterAutomation.assignee_id
+        ? usersById.get(ticketAfterAutomation.assignee_id) ?? null
         : null,
-      creator: usersById.get(insertedTicket.created_by) ?? null,
+      creator: usersById.get(ticketAfterAutomation.created_by) ?? null,
       customer,
     };
 
     const assigneeRecipients = getUniqueRecipientIds(
-      [insertedTicket.assignee_id],
+      [ticketAfterAutomation.assignee_id],
       userId,
     );
     if (assigneeRecipients.length > 0) {
       await insertAppNotifications(
         supabase,
         assigneeRecipients.map((recipientId) => ({
-          userId: recipientId,
-          organizationId: activeOrgId,
-          type: "ticket",
-          title: "New ticket assigned",
-          body: `Ticket "${insertedTicket.title}" has been assigned to you.`,
-          entityType: "ticket",
-          entityId: insertedTicket.id,
-        })),
+            userId: recipientId,
+            organizationId: activeOrgId,
+            type: "ticket",
+            title: "New ticket assigned",
+            body: `Ticket "${ticketAfterAutomation.title}" has been assigned to you.`,
+            entityType: "ticket",
+            entityId: ticketAfterAutomation.id,
+          })),
       );
     }
 
@@ -737,7 +754,7 @@ export async function POST(req: Request) {
       supabase,
       organizationId: activeOrgId,
       actorUserId: userId,
-      ticketId: insertedTicket.id,
+      ticketId: ticketAfterAutomation.id,
     });
 
     return NextResponse.json({ ticket }, { status: 201 });
