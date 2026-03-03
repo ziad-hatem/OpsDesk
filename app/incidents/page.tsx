@@ -2,7 +2,19 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Globe, Loader2, Plus, RefreshCcw, Save, Send, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  Loader2,
+  Plus,
+  RefreshCcw,
+  Save,
+  Search,
+  Send,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -12,6 +24,12 @@ import { Textarea } from "@/app/components/ui/textarea";
 import { Badge } from "@/app/components/ui/badge";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { Switch } from "@/app/components/ui/switch";
+import { EmptyState } from "@/app/components/ui/empty-state";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/app/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -187,6 +205,12 @@ function healthBadgeClass(health: IncidentServiceHealth): string {
   return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
 }
 
+function sortIncidentUpdatesByNewest(incident: IncidentItem): IncidentItem["updates"] {
+  return [...incident.updates].sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
 async function readApiError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: string };
@@ -214,6 +238,7 @@ export default function IncidentsPage() {
   const [createServiceForm, setCreateServiceForm] =
     useState<CreateServiceFormState>(INITIAL_SERVICE_FORM);
   const [isCreatingService, setIsCreatingService] = useState(false);
+  const [showCreateServiceForm, setShowCreateServiceForm] = useState(false);
 
   const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceDraft>>({});
   const [savingServiceId, setSavingServiceId] = useState<string | null>(null);
@@ -222,6 +247,20 @@ export default function IncidentsPage() {
 
   const [timelineDrafts, setTimelineDrafts] = useState<Record<string, IncidentTimelineDraft>>({});
   const [postingUpdateId, setPostingUpdateId] = useState<string | null>(null);
+  const [expandedTimelineIncidentIds, setExpandedTimelineIncidentIds] = useState<
+    Record<string, boolean>
+  >({});
+
+  const [showCreateIncidentForm, setShowCreateIncidentForm] = useState(false);
+  const [showResolvedIncidents, setShowResolvedIncidents] = useState(false);
+  const [incidentQuery, setIncidentQuery] = useState("");
+  const [incidentStatusFilter, setIncidentStatusFilter] = useState<IncidentStatus | "all">("all");
+  const [incidentSeverityFilter, setIncidentSeverityFilter] = useState<IncidentSeverity | "all">(
+    "all",
+  );
+  const [incidentVisibilityFilter, setIncidentVisibilityFilter] = useState<
+    "all" | "public" | "internal"
+  >("all");
 
   const canManage = useMemo(() => {
     const role = data?.currentUserRole;
@@ -337,6 +376,7 @@ export default function IncidentsPage() {
 
       toast.success("Service created");
       setCreateServiceForm(INITIAL_SERVICE_FORM);
+      setShowCreateServiceForm(false);
       await loadIncidents();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create service";
@@ -467,6 +507,7 @@ export default function IncidentsPage() {
       toast.success("Incident created");
       setCreateIncidentForm(INITIAL_INCIDENT_FORM);
       setSelectedImpacts({});
+      setShowCreateIncidentForm(false);
       await loadIncidents();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create incident";
@@ -535,6 +576,110 @@ export default function IncidentsPage() {
     [data?.incidents],
   );
 
+  const normalizedIncidentQuery = incidentQuery.trim().toLowerCase();
+  const hasIncidentFilters = useMemo(
+    () =>
+      Boolean(
+        normalizedIncidentQuery ||
+          incidentStatusFilter !== "all" ||
+          incidentSeverityFilter !== "all" ||
+          incidentVisibilityFilter !== "all",
+      ),
+    [
+      incidentSeverityFilter,
+      incidentStatusFilter,
+      incidentVisibilityFilter,
+      normalizedIncidentQuery,
+    ],
+  );
+
+  const matchesIncidentFilters = useCallback(
+    (incident: IncidentItem) => {
+      if (incidentStatusFilter !== "all" && incident.status !== incidentStatusFilter) {
+        return false;
+      }
+      if (incidentSeverityFilter !== "all" && incident.severity !== incidentSeverityFilter) {
+        return false;
+      }
+      if (incidentVisibilityFilter === "public" && !incident.is_public) {
+        return false;
+      }
+      if (incidentVisibilityFilter === "internal" && incident.is_public) {
+        return false;
+      }
+
+      if (!normalizedIncidentQuery) {
+        return true;
+      }
+
+      const searchable = [
+        incident.title,
+        incident.summary ?? "",
+        ...incident.impacts.map((impact) => impact.service?.name ?? ""),
+        ...incident.updates.slice(0, 5).map((update) => update.message),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(normalizedIncidentQuery);
+    },
+    [
+      incidentSeverityFilter,
+      incidentStatusFilter,
+      incidentVisibilityFilter,
+      normalizedIncidentQuery,
+    ],
+  );
+
+  const filteredActiveIncidents = useMemo(
+    () => activeIncidents.filter(matchesIncidentFilters),
+    [activeIncidents, matchesIncidentFilters],
+  );
+
+  const filteredResolvedIncidents = useMemo(
+    () => resolvedIncidents.filter(matchesIncidentFilters),
+    [matchesIncidentFilters, resolvedIncidents],
+  );
+
+  const degradedServicesCount = useMemo(
+    () =>
+      (data?.services ?? []).filter((service) => service.current_status !== "operational").length,
+    [data?.services],
+  );
+
+  const publicActiveIncidentsCount = useMemo(
+    () => activeIncidents.filter((incident) => incident.is_public).length,
+    [activeIncidents],
+  );
+
+  const criticalActiveIncidentsCount = useMemo(
+    () => activeIncidents.filter((incident) => incident.severity === "critical").length,
+    [activeIncidents],
+  );
+
+  const latestIncidentActivity = useMemo(() => {
+    let latestTimestamp = 0;
+    let latestLabel = "No incident activity yet";
+
+    for (const incident of data?.incidents ?? []) {
+      const startedAt = new Date(incident.started_at).getTime();
+      if (startedAt > latestTimestamp) {
+        latestTimestamp = startedAt;
+        latestLabel = `Started ${formatDateTime(incident.started_at)}`;
+      }
+
+      for (const update of incident.updates) {
+        const updatedAt = new Date(update.created_at).getTime();
+        if (updatedAt > latestTimestamp) {
+          latestTimestamp = updatedAt;
+          latestLabel = `Updated ${formatDateTime(update.created_at)}`;
+        }
+      }
+    }
+
+    return latestLabel;
+  }, [data?.incidents]);
+
   if (!activeOrgId) {
     return (
       <div className="space-y-4 p-6">
@@ -585,6 +730,44 @@ export default function IncidentsPage() {
         </div>
       </div>
 
+      {data ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Card>
+            <CardContent className="space-y-1 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Active incidents</p>
+              <p className="text-2xl font-semibold text-foreground">{activeIncidents.length}</p>
+              <p className="text-xs text-muted-foreground">
+                {publicActiveIncidentsCount} public visibility
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="space-y-1 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Critical incidents
+              </p>
+              <p className="text-2xl font-semibold text-foreground">{criticalActiveIncidentsCount}</p>
+              <p className="text-xs text-muted-foreground">Requires immediate triage</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="space-y-1 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Non-operational services
+              </p>
+              <p className="text-2xl font-semibold text-foreground">{degradedServicesCount}</p>
+              <p className="text-xs text-muted-foreground">Across all tracked services</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="space-y-1 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Latest activity</p>
+              <p className="text-sm font-medium text-foreground">{latestIncidentActivity}</p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
       {!canManage && data ? (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="py-4 text-sm text-amber-800">
@@ -622,96 +805,130 @@ export default function IncidentsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {canManage ? (
-                <form className="grid grid-cols-1 gap-3 rounded-lg border border-border p-4 md:grid-cols-2 xl:grid-cols-6" onSubmit={handleCreateService}>
-                  <div className="space-y-2 xl:col-span-2">
-                    <Label htmlFor="service-name">Service Name</Label>
-                    <Input
-                      id="service-name"
-                      value={createServiceForm.name}
-                      onChange={(event) =>
-                        setCreateServiceForm((prev) => ({ ...prev, name: event.target.value }))
-                      }
-                      placeholder="API Gateway"
-                      disabled={isCreatingService}
-                    />
-                  </div>
-                  <div className="space-y-2 xl:col-span-2">
-                    <Label htmlFor="service-description">Description</Label>
-                    <Input
-                      id="service-description"
-                      value={createServiceForm.description}
-                      onChange={(event) =>
-                        setCreateServiceForm((prev) => ({
-                          ...prev,
-                          description: event.target.value,
-                        }))
-                      }
-                      placeholder="Public API and auth edge"
-                      disabled={isCreatingService}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select
-                      value={createServiceForm.currentStatus}
-                      onValueChange={(value) =>
-                        setCreateServiceForm((prev) => ({
-                          ...prev,
-                          currentStatus: value as IncidentServiceHealth,
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SERVICE_HEALTH_OPTIONS.map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {toLabel(status)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="service-order">Display Order</Label>
-                    <Input
-                      id="service-order"
-                      type="number"
-                      value={createServiceForm.displayOrder}
-                      onChange={(event) =>
-                        setCreateServiceForm((prev) => ({
-                          ...prev,
-                          displayOrder: Number(event.target.value || "0"),
-                        }))
-                      }
-                      disabled={isCreatingService}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 md:col-span-2 xl:col-span-3">
+                <div className="rounded-lg border border-border p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Show on public page</p>
-                      <p className="text-xs text-muted-foreground">Hide internal-only services</p>
+                      <p className="text-sm font-medium text-foreground">Add a status service</p>
+                      <p className="text-xs text-muted-foreground">
+                        Keep this collapsed when you are only monitoring active incidents.
+                      </p>
                     </div>
-                    <Switch
-                      checked={createServiceForm.isPublic}
-                      onCheckedChange={(checked) =>
-                        setCreateServiceForm((prev) => ({ ...prev, isPublic: checked }))
-                      }
-                      disabled={isCreatingService}
-                    />
-                  </div>
-                  <div className="md:col-span-2 xl:col-span-3">
-                    <Button type="submit" className="w-full gap-2" disabled={isCreatingService}>
-                      {isCreatingService ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => setShowCreateServiceForm((prev) => !prev)}
+                    >
+                      {showCreateServiceForm ? (
+                        <>
+                          <ChevronUp className="h-4 w-4" />
+                          Hide form
+                        </>
                       ) : (
-                        <Plus className="h-4 w-4" />
+                        <>
+                          <Plus className="h-4 w-4" />
+                          Add service
+                        </>
                       )}
-                      Add Service
                     </Button>
                   </div>
-                </form>
+
+                  {showCreateServiceForm ? (
+                    <form
+                      className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6"
+                      onSubmit={handleCreateService}
+                    >
+                      <div className="space-y-2 xl:col-span-2">
+                        <Label htmlFor="service-name">Service Name</Label>
+                        <Input
+                          id="service-name"
+                          value={createServiceForm.name}
+                          onChange={(event) =>
+                            setCreateServiceForm((prev) => ({ ...prev, name: event.target.value }))
+                          }
+                          placeholder="API Gateway"
+                          disabled={isCreatingService}
+                        />
+                      </div>
+                      <div className="space-y-2 xl:col-span-2">
+                        <Label htmlFor="service-description">Description</Label>
+                        <Input
+                          id="service-description"
+                          value={createServiceForm.description}
+                          onChange={(event) =>
+                            setCreateServiceForm((prev) => ({
+                              ...prev,
+                              description: event.target.value,
+                            }))
+                          }
+                          placeholder="Public API and auth edge"
+                          disabled={isCreatingService}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={createServiceForm.currentStatus}
+                          onValueChange={(value) =>
+                            setCreateServiceForm((prev) => ({
+                              ...prev,
+                              currentStatus: value as IncidentServiceHealth,
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SERVICE_HEALTH_OPTIONS.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {toLabel(status)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="service-order">Display Order</Label>
+                        <Input
+                          id="service-order"
+                          type="number"
+                          value={createServiceForm.displayOrder}
+                          onChange={(event) =>
+                            setCreateServiceForm((prev) => ({
+                              ...prev,
+                              displayOrder: Number(event.target.value || "0"),
+                            }))
+                          }
+                          disabled={isCreatingService}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 md:col-span-2 xl:col-span-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Show on public page</p>
+                          <p className="text-xs text-muted-foreground">Hide internal-only services</p>
+                        </div>
+                        <Switch
+                          checked={createServiceForm.isPublic}
+                          onCheckedChange={(checked) =>
+                            setCreateServiceForm((prev) => ({ ...prev, isPublic: checked }))
+                          }
+                          disabled={isCreatingService}
+                        />
+                      </div>
+                      <div className="md:col-span-2 xl:col-span-3">
+                        <Button type="submit" className="w-full gap-2" disabled={isCreatingService}>
+                          {isCreatingService ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                          Add Service
+                        </Button>
+                      </div>
+                    </form>
+                  ) : null}
+                </div>
               ) : null}
 
               {data.services.length === 0 ? (
@@ -859,235 +1076,377 @@ export default function IncidentsPage() {
 
           {canManage ? (
             <Card>
-              <CardHeader>
-                <CardTitle>Create Incident</CardTitle>
-                <CardDescription>
-                  Declare a new incident and choose which services are impacted.
-                </CardDescription>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Create Incident</CardTitle>
+                  <CardDescription>
+                    Keep this minimized during monitoring, then expand to declare quickly.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setShowCreateIncidentForm((prev) => !prev)}
+                >
+                  {showCreateIncidentForm ? (
+                    <>
+                      <ChevronUp className="h-4 w-4" />
+                      Hide form
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Declare incident
+                    </>
+                  )}
+                </Button>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4" onSubmit={handleCreateIncident}>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="incident-title">Title</Label>
-                      <Input
-                        id="incident-title"
-                        value={createIncidentForm.title}
-                        onChange={(event) =>
-                          setCreateIncidentForm((prev) => ({ ...prev, title: event.target.value }))
-                        }
-                        placeholder="API latency spike in EU region"
-                        disabled={isCreatingIncident}
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="incident-summary">Summary</Label>
-                      <Textarea
-                        id="incident-summary"
-                        value={createIncidentForm.summary}
-                        onChange={(event) =>
-                          setCreateIncidentForm((prev) => ({
-                            ...prev,
-                            summary: event.target.value,
-                          }))
-                        }
-                        rows={2}
-                        placeholder="Describe what users are seeing."
-                        disabled={isCreatingIncident}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={createIncidentForm.status}
-                        onValueChange={(value) =>
-                          setCreateIncidentForm((prev) => ({
-                            ...prev,
-                            status: value as IncidentStatus,
-                          }))
-                        }
-                        disabled={isCreatingIncident}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INCIDENT_STATUS_OPTIONS.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {toLabel(status)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Severity</Label>
-                      <Select
-                        value={createIncidentForm.severity}
-                        onValueChange={(value) => {
-                          const nextSeverity = value as IncidentSeverity;
-                          setCreateIncidentForm((prev) => ({
-                            ...prev,
-                            severity: nextSeverity,
-                          }));
-                          setSelectedImpacts((prev) => {
-                            const next: Record<string, IncidentServiceHealth> = {};
-                            for (const [serviceId, impact] of Object.entries(prev)) {
-                              next[serviceId] =
-                                impact || defaultImpactForSeverity(nextSeverity);
-                            }
-                            return next;
-                          });
-                        }}
-                        disabled={isCreatingIncident}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INCIDENT_SEVERITY_OPTIONS.map((severity) => (
-                            <SelectItem key={severity} value={severity}>
-                              {toLabel(severity)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="initial-message">Initial Timeline Update</Label>
-                      <Textarea
-                        id="initial-message"
-                        rows={2}
-                        value={createIncidentForm.initialMessage}
-                        onChange={(event) =>
-                          setCreateIncidentForm((prev) => ({
-                            ...prev,
-                            initialMessage: event.target.value,
-                          }))
-                        }
-                        placeholder="Investigating elevated error rate for checkout API."
-                        disabled={isCreatingIncident}
-                      />
-                    </div>
-                    <div className="rounded-md border border-border px-3 py-2 md:col-span-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Public incident</p>
-                          <p className="text-xs text-muted-foreground">
-                            Publish this incident and updates to the public status page.
-                          </p>
-                        </div>
-                        <Switch
-                          checked={createIncidentForm.isPublic}
-                          onCheckedChange={(checked) =>
-                            setCreateIncidentForm((prev) => ({ ...prev, isPublic: checked }))
+                {showCreateIncidentForm ? (
+                  <form className="space-y-4" onSubmit={handleCreateIncident}>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="incident-title">Title</Label>
+                        <Input
+                          id="incident-title"
+                          value={createIncidentForm.title}
+                          onChange={(event) =>
+                            setCreateIncidentForm((prev) => ({ ...prev, title: event.target.value }))
                           }
+                          placeholder="API latency spike in EU region"
                           disabled={isCreatingIncident}
                         />
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label>Impacted Services</Label>
-                    {data.services.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Add at least one service before declaring incident impacts.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        {data.services.map((service) => {
-                          const selected = Boolean(selectedImpacts[service.id]);
-                          return (
-                            <div
-                              key={service.id}
-                              className="rounded-md border border-border p-3"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    id={`impact-${service.id}`}
-                                    checked={selected}
-                                    onCheckedChange={(checked) =>
-                                      handleImpactToggle(service.id, Boolean(checked))
-                                    }
-                                    disabled={isCreatingIncident}
-                                  />
-                                  <Label
-                                    htmlFor={`impact-${service.id}`}
-                                    className="cursor-pointer font-medium"
-                                  >
-                                    {service.name}
-                                  </Label>
-                                </div>
-                                <Badge className={healthBadgeClass(service.current_status)}>
-                                  {toLabel(service.current_status)}
-                                </Badge>
-                              </div>
-                              {selected ? (
-                                <div className="mt-2">
-                                  <Select
-                                    value={selectedImpacts[service.id]}
-                                    onValueChange={(value) =>
-                                      setSelectedImpacts((prev) => ({
-                                        ...prev,
-                                        [service.id]: value as IncidentServiceHealth,
-                                      }))
-                                    }
-                                    disabled={isCreatingIncident}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {IMPACT_LEVEL_OPTIONS.map((impactLevel) => (
-                                        <SelectItem key={impactLevel} value={impactLevel}>
-                                          {toLabel(impactLevel)}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="incident-summary">Summary</Label>
+                        <Textarea
+                          id="incident-summary"
+                          value={createIncidentForm.summary}
+                          onChange={(event) =>
+                            setCreateIncidentForm((prev) => ({
+                              ...prev,
+                              summary: event.target.value,
+                            }))
+                          }
+                          rows={2}
+                          placeholder="Describe what users are seeing."
+                          disabled={isCreatingIncident}
+                        />
                       </div>
-                    )}
-                  </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={createIncidentForm.status}
+                          onValueChange={(value) =>
+                            setCreateIncidentForm((prev) => ({
+                              ...prev,
+                              status: value as IncidentStatus,
+                            }))
+                          }
+                          disabled={isCreatingIncident}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INCIDENT_STATUS_OPTIONS.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {toLabel(status)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Severity</Label>
+                        <Select
+                          value={createIncidentForm.severity}
+                          onValueChange={(value) => {
+                            const nextSeverity = value as IncidentSeverity;
+                            setCreateIncidentForm((prev) => ({
+                              ...prev,
+                              severity: nextSeverity,
+                            }));
+                            setSelectedImpacts((prev) => {
+                              const next: Record<string, IncidentServiceHealth> = {};
+                              for (const [serviceId, impact] of Object.entries(prev)) {
+                                next[serviceId] = impact || defaultImpactForSeverity(nextSeverity);
+                              }
+                              return next;
+                            });
+                          }}
+                          disabled={isCreatingIncident}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INCIDENT_SEVERITY_OPTIONS.map((severity) => (
+                              <SelectItem key={severity} value={severity}>
+                                {toLabel(severity)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="initial-message">Initial Timeline Update</Label>
+                        <Textarea
+                          id="initial-message"
+                          rows={2}
+                          value={createIncidentForm.initialMessage}
+                          onChange={(event) =>
+                            setCreateIncidentForm((prev) => ({
+                              ...prev,
+                              initialMessage: event.target.value,
+                            }))
+                          }
+                          placeholder="Investigating elevated error rate for checkout API."
+                          disabled={isCreatingIncident}
+                        />
+                      </div>
+                      <div className="rounded-md border border-border px-3 py-2 md:col-span-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Public incident</p>
+                            <p className="text-xs text-muted-foreground">
+                              Publish this incident and updates to the public status page.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={createIncidentForm.isPublic}
+                            onCheckedChange={(checked) =>
+                              setCreateIncidentForm((prev) => ({ ...prev, isPublic: checked }))
+                            }
+                            disabled={isCreatingIncident}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-                  <Button type="submit" className="gap-2" disabled={isCreatingIncident}>
-                    {isCreatingIncident ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                    Declare Incident
-                  </Button>
-                </form>
+                    <div className="space-y-3">
+                      <Label>Impacted Services</Label>
+                      {data.services.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Add at least one service before declaring incident impacts.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                          {data.services.map((service) => {
+                            const selected = Boolean(selectedImpacts[service.id]);
+                            return (
+                              <div key={service.id} className="rounded-md border border-border p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox
+                                      id={`impact-${service.id}`}
+                                      checked={selected}
+                                      onCheckedChange={(checked) =>
+                                        handleImpactToggle(service.id, Boolean(checked))
+                                      }
+                                      disabled={isCreatingIncident}
+                                    />
+                                    <Label
+                                      htmlFor={`impact-${service.id}`}
+                                      className="cursor-pointer font-medium"
+                                    >
+                                      {service.name}
+                                    </Label>
+                                  </div>
+                                  <Badge className={healthBadgeClass(service.current_status)}>
+                                    {toLabel(service.current_status)}
+                                  </Badge>
+                                </div>
+                                {selected ? (
+                                  <div className="mt-2">
+                                    <Select
+                                      value={selectedImpacts[service.id]}
+                                      onValueChange={(value) =>
+                                        setSelectedImpacts((prev) => ({
+                                          ...prev,
+                                          [service.id]: value as IncidentServiceHealth,
+                                        }))
+                                      }
+                                      disabled={isCreatingIncident}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {IMPACT_LEVEL_OPTIONS.map((impactLevel) => (
+                                          <SelectItem key={impactLevel} value={impactLevel}>
+                                            {toLabel(impactLevel)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button type="submit" className="gap-2" disabled={isCreatingIncident}>
+                      {isCreatingIncident ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                      Declare Incident
+                    </Button>
+                  </form>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Open the form when you need to declare a new incident.
+                  </p>
+                )}
               </CardContent>
             </Card>
           ) : null}
 
           <Card>
             <CardHeader>
+              <CardTitle>Find Incidents Faster</CardTitle>
+              <CardDescription>
+                Filter by status, severity, visibility, or search by title, impact, and updates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-2 xl:col-span-2">
+                <Label htmlFor="incident-search">Search</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="incident-search"
+                    value={incidentQuery}
+                    onChange={(event) => setIncidentQuery(event.target.value)}
+                    placeholder="Search title, summary, impacted service, or update text"
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={incidentStatusFilter}
+                  onValueChange={(value) => setIncidentStatusFilter(value as IncidentStatus | "all")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {INCIDENT_STATUS_OPTIONS.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {toLabel(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Severity</Label>
+                <Select
+                  value={incidentSeverityFilter}
+                  onValueChange={(value) =>
+                    setIncidentSeverityFilter(value as IncidentSeverity | "all")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All severities</SelectItem>
+                    {INCIDENT_SEVERITY_OPTIONS.map((severity) => (
+                      <SelectItem key={severity} value={severity}>
+                        {toLabel(severity)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Visibility</Label>
+                <Select
+                  value={incidentVisibilityFilter}
+                  onValueChange={(value) =>
+                    setIncidentVisibilityFilter(value as "all" | "public" | "internal")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All visibility</SelectItem>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="internal">Internal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="md:col-span-2 xl:col-span-5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setIncidentQuery("");
+                    setIncidentStatusFilter("all");
+                    setIncidentSeverityFilter("all");
+                    setIncidentVisibilityFilter("all");
+                  }}
+                  disabled={!hasIncidentFilters}
+                >
+                  Clear filters
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Active Incidents</CardTitle>
               <CardDescription>
-                {activeIncidents.length > 0
-                  ? "Live incidents and latest timeline updates."
-                  : "No active incidents right now."}
+                {filteredActiveIncidents.length > 0
+                  ? `${filteredActiveIncidents.length} matching incident${
+                      filteredActiveIncidents.length === 1 ? "" : "s"
+                    }.`
+                  : hasIncidentFilters
+                    ? "No active incidents match current filters."
+                    : "No active incidents right now."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeIncidents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No active incidents.</p>
+              {filteredActiveIncidents.length === 0 ? (
+                <EmptyState
+                  title={hasIncidentFilters ? "No matching active incidents" : "No active incidents"}
+                  description={
+                    hasIncidentFilters
+                      ? "Try broadening your filters or clearing search."
+                      : "Everything looks healthy right now."
+                  }
+                  action={
+                    canManage ? (
+                      <Button type="button" variant="outline" onClick={() => setShowCreateIncidentForm(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Declare Incident
+                      </Button>
+                    ) : null
+                  }
+                />
               ) : (
-                activeIncidents.map((incident) => {
+                filteredActiveIncidents.map((incident) => {
                   const timelineDraft = timelineDrafts[incident.id] ?? {
                     message: "",
                     status: incident.status,
                     isPublic: incident.is_public,
                   };
+                  const orderedUpdates = sortIncidentUpdatesByNewest(incident);
+                  const latestUpdate = orderedUpdates[0] ?? null;
+                  const historicalUpdates = orderedUpdates.slice(1);
+                  const isHistoryOpen = Boolean(expandedTimelineIncidentIds[incident.id]);
                   return (
                     <div key={incident.id} className="rounded-lg border border-border bg-background p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1127,25 +1486,60 @@ export default function IncidentsPage() {
                         <p className="mt-3 text-xs text-muted-foreground">No impacted services linked.</p>
                       )}
 
-                      <div className="mt-4 space-y-2">
-                        {incident.updates.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No timeline updates yet.</p>
-                        ) : (
-                          incident.updates.map((update) => (
-                            <div
-                              key={update.id}
-                              className="rounded-md border border-border bg-muted/50 p-3"
-                            >
-                              <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>{formatDateTime(update.created_at)}</span>
-                                {update.status ? <span>| {toLabel(update.status)}</span> : null}
-                                {update.is_public ? <span>| Public</span> : <span>| Internal</span>}
+                      {latestUpdate ? (
+                        <div className="mt-4 rounded-md border border-border bg-muted/50 p-3">
+                          <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Latest update</span>
+                            <span>-</span>
+                            <span>{formatDateTime(latestUpdate.created_at)}</span>
+                            {latestUpdate.status ? <span>- {toLabel(latestUpdate.status)}</span> : null}
+                            {latestUpdate.is_public ? <span>- Public</span> : <span>- Internal</span>}
+                          </div>
+                          <p className="text-sm text-foreground">{latestUpdate.message}</p>
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-sm text-muted-foreground">No timeline updates yet.</p>
+                      )}
+
+                      {historicalUpdates.length > 0 ? (
+                        <Collapsible
+                          open={isHistoryOpen}
+                          onOpenChange={(open) =>
+                            setExpandedTimelineIncidentIds((prev) => ({
+                              ...prev,
+                              [incident.id]: open,
+                            }))
+                          }
+                        >
+                          <CollapsibleTrigger asChild>
+                            <Button type="button" variant="ghost" className="mt-2 gap-2 px-1">
+                              {isHistoryOpen ? (
+                                <>
+                                  <ChevronUp className="h-4 w-4" />
+                                  Hide previous updates
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronDown className="h-4 w-4" />
+                                  Show previous updates ({historicalUpdates.length})
+                                </>
+                              )}
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2 space-y-2">
+                            {historicalUpdates.map((update) => (
+                              <div key={update.id} className="rounded-md border border-border p-3">
+                                <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{formatDateTime(update.created_at)}</span>
+                                  {update.status ? <span>- {toLabel(update.status)}</span> : null}
+                                  {update.is_public ? <span>- Public</span> : <span>- Internal</span>}
+                                </div>
+                                <p className="text-sm text-foreground">{update.message}</p>
                               </div>
-                              <p className="text-sm text-foreground">{update.message}</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ) : null}
 
                       {canManage ? (
                         <div className="mt-4 rounded-md border border-border p-3">
@@ -1241,38 +1635,67 @@ export default function IncidentsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Resolved Incidents</CardTitle>
-              <CardDescription>Recent incidents that were fully resolved.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {resolvedIncidents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No resolved incidents yet.</p>
-              ) : (
-                resolvedIncidents.map((incident) => (
-                  <div key={incident.id} className="rounded-md border border-border p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-foreground">{incident.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Resolved {formatDateTime(incident.resolved_at)}
-                        </p>
+          <Collapsible open={showResolvedIncidents} onOpenChange={setShowResolvedIncidents}>
+            <Card>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Resolved Incidents</CardTitle>
+                  <CardDescription>
+                    {filteredResolvedIncidents.length > 0
+                      ? `${filteredResolvedIncidents.length} matching resolved incident${
+                          filteredResolvedIncidents.length === 1 ? "" : "s"
+                        }.`
+                      : hasIncidentFilters
+                        ? "No resolved incidents match current filters."
+                        : "Recent incidents that were fully resolved."}
+                  </CardDescription>
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="outline" className="gap-2">
+                    {showResolvedIncidents ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Hide resolved
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Show resolved
+                      </>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-3">
+                  {filteredResolvedIncidents.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No resolved incidents to show.</p>
+                  ) : (
+                    filteredResolvedIncidents.map((incident) => (
+                      <div key={incident.id} className="rounded-md border border-border p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-foreground">{incident.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Resolved {formatDateTime(incident.resolved_at)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={statusBadgeClass(incident.status)}>
+                              {toLabel(incident.status)}
+                            </Badge>
+                            <Badge className={severityBadgeClass(incident.severity)}>
+                              {toLabel(incident.severity)}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={statusBadgeClass(incident.status)}>
-                          {toLabel(incident.status)}
-                        </Badge>
-                        <Badge className={severityBadgeClass(incident.severity)}>
-                          {toLabel(incident.severity)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+                    ))
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </>
       ) : null}
 

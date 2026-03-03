@@ -1,0 +1,1320 @@
+   1: "use client";
+   2: 
+   3: import Link from "next/link";
+   4: import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+   5: import { AlertTriangle, Globe, Loader2, Plus, RefreshCcw, Save, Send, Trash2 } from "lucide-react";
+   6: import { toast } from "sonner";
+   7: import { Button } from "@/app/components/ui/button";
+   8: import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+   9: import { Input } from "@/app/components/ui/input";
+  10: import { Label } from "@/app/components/ui/label";
+  11: import { Textarea } from "@/app/components/ui/textarea";
+  12: import { Badge } from "@/app/components/ui/badge";
+  13: import { Checkbox } from "@/app/components/ui/checkbox";
+  14: import { Switch } from "@/app/components/ui/switch";
+  15: import {
+  16:   Select,
+  17:   SelectContent,
+  18:   SelectItem,
+  19:   SelectTrigger,
+  20:   SelectValue,
+  21: } from "@/app/components/ui/select";
+  22: import {
+  23:   AlertDialog,
+  24:   AlertDialogAction,
+  25:   AlertDialogCancel,
+  26:   AlertDialogContent,
+  27:   AlertDialogDescription,
+  28:   AlertDialogFooter,
+  29:   AlertDialogHeader,
+  30:   AlertDialogTitle,
+  31: } from "@/app/components/ui/alert-dialog";
+  32: import { useAppSelector } from "@/lib/store/hooks";
+  33: import { selectTopbarActiveOrganizationId } from "@/lib/store/slices/topbar-slice";
+  34: import type {
+  35:   IncidentItem,
+  36:   IncidentsResponse,
+  37:   IncidentService,
+  38:   IncidentServiceHealth,
+  39:   IncidentSeverity,
+  40:   IncidentStatus,
+  41: } from "@/lib/incidents/types";
+  42: 
+  43: const SERVICE_HEALTH_OPTIONS: IncidentServiceHealth[] = [
+  44:   "operational",
+  45:   "degraded",
+  46:   "partial_outage",
+  47:   "major_outage",
+  48:   "maintenance",
+  49: ];
+  50: 
+  51: const IMPACT_LEVEL_OPTIONS: IncidentServiceHealth[] = [
+  52:   "degraded",
+  53:   "partial_outage",
+  54:   "major_outage",
+  55:   "maintenance",
+  56: ];
+  57: 
+  58: const INCIDENT_STATUS_OPTIONS: IncidentStatus[] = [
+  59:   "investigating",
+  60:   "identified",
+  61:   "monitoring",
+  62:   "resolved",
+  63: ];
+  64: 
+  65: const INCIDENT_SEVERITY_OPTIONS: IncidentSeverity[] = [
+  66:   "critical",
+  67:   "high",
+  68:   "medium",
+  69:   "low",
+  70: ];
+  71: 
+  72: type ServiceDraft = {
+  73:   name: string;
+  74:   description: string;
+  75:   currentStatus: IncidentServiceHealth;
+  76:   isPublic: boolean;
+  77:   displayOrder: number;
+  78: };
+  79: 
+  80: type IncidentTimelineDraft = {
+  81:   message: string;
+  82:   status: IncidentStatus;
+  83:   isPublic: boolean;
+  84: };
+  85: 
+  86: type CreateIncidentFormState = {
+  87:   title: string;
+  88:   summary: string;
+  89:   status: IncidentStatus;
+  90:   severity: IncidentSeverity;
+  91:   isPublic: boolean;
+  92:   initialMessage: string;
+  93: };
+  94: 
+  95: type CreateServiceFormState = {
+  96:   name: string;
+  97:   description: string;
+  98:   currentStatus: IncidentServiceHealth;
+  99:   isPublic: boolean;
+ 100:   displayOrder: number;
+ 101: };
+ 102: 
+ 103: const INITIAL_INCIDENT_FORM: CreateIncidentFormState = {
+ 104:   title: "",
+ 105:   summary: "",
+ 106:   status: "investigating",
+ 107:   severity: "medium",
+ 108:   isPublic: true,
+ 109:   initialMessage: "",
+ 110: };
+ 111: 
+ 112: const INITIAL_SERVICE_FORM: CreateServiceFormState = {
+ 113:   name: "",
+ 114:   description: "",
+ 115:   currentStatus: "operational",
+ 116:   isPublic: true,
+ 117:   displayOrder: 0,
+ 118: };
+ 119: 
+ 120: function toLabel(value: string): string {
+ 121:   return value
+ 122:     .split("_")
+ 123:     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+ 124:     .join(" ");
+ 125: }
+ 126: 
+ 127: function formatDateTime(value: string | null): string {
+ 128:   if (!value) {
+ 129:     return "N/A";
+ 130:   }
+ 131:   const parsed = new Date(value);
+ 132:   if (Number.isNaN(parsed.getTime())) {
+ 133:     return value;
+ 134:   }
+ 135:   return parsed.toLocaleString();
+ 136: }
+ 137: 
+ 138: function defaultImpactForSeverity(severity: IncidentSeverity): IncidentServiceHealth {
+ 139:   if (severity === "critical") {
+ 140:     return "major_outage";
+ 141:   }
+ 142:   if (severity === "high") {
+ 143:     return "partial_outage";
+ 144:   }
+ 145:   return "degraded";
+ 146: }
+ 147: 
+ 148: function severityBadgeClass(severity: IncidentSeverity): string {
+ 149:   if (severity === "critical") {
+ 150:     return "bg-red-100 text-red-800 hover:bg-red-100";
+ 151:   }
+ 152:   if (severity === "high") {
+ 153:     return "bg-orange-100 text-orange-800 hover:bg-orange-100";
+ 154:   }
+ 155:   if (severity === "medium") {
+ 156:     return "bg-amber-100 text-amber-800 hover:bg-amber-100";
+ 157:   }
+ 158:   return "bg-muted text-foreground hover:bg-muted";
+ 159: }
+ 160: 
+ 161: function statusBadgeClass(status: IncidentStatus): string {
+ 162:   if (status === "resolved") {
+ 163:     return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
+ 164:   }
+ 165:   if (status === "monitoring") {
+ 166:     return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+ 167:   }
+ 168:   if (status === "identified") {
+ 169:     return "bg-orange-100 text-orange-800 hover:bg-orange-100";
+ 170:   }
+ 171:   return "bg-red-100 text-red-800 hover:bg-red-100";
+ 172: }
+ 173: 
+ 174: function healthBadgeClass(health: IncidentServiceHealth): string {
+ 175:   if (health === "major_outage") {
+ 176:     return "bg-red-100 text-red-800 hover:bg-red-100";
+ 177:   }
+ 178:   if (health === "partial_outage") {
+ 179:     return "bg-orange-100 text-orange-800 hover:bg-orange-100";
+ 180:   }
+ 181:   if (health === "degraded") {
+ 182:     return "bg-amber-100 text-amber-800 hover:bg-amber-100";
+ 183:   }
+ 184:   if (health === "maintenance") {
+ 185:     return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+ 186:   }
+ 187:   return "bg-emerald-100 text-emerald-800 hover:bg-emerald-100";
+ 188: }
+ 189: 
+ 190: async function readApiError(response: Response): Promise<string> {
+ 191:   try {
+ 192:     const payload = (await response.json()) as { error?: string };
+ 193:     if (payload.error) {
+ 194:       return payload.error;
+ 195:     }
+ 196:   } catch {
+ 197:     // ignored
+ 198:   }
+ 199:   return response.statusText || `Request failed (${response.status})`;
+ 200: }
+ 201: 
+ 202: export default function IncidentsPage() {
+ 203:   const activeOrgId = useAppSelector(selectTopbarActiveOrganizationId);
+ 204: 
+ 205:   const [data, setData] = useState<IncidentsResponse | null>(null);
+ 206:   const [isLoading, setIsLoading] = useState(true);
+ 207:   const [error, setError] = useState<string | null>(null);
+ 208: 
+ 209:   const [createIncidentForm, setCreateIncidentForm] =
+ 210:     useState<CreateIncidentFormState>(INITIAL_INCIDENT_FORM);
+ 211:   const [selectedImpacts, setSelectedImpacts] = useState<Record<string, IncidentServiceHealth>>({});
+ 212:   const [isCreatingIncident, setIsCreatingIncident] = useState(false);
+ 213: 
+ 214:   const [createServiceForm, setCreateServiceForm] =
+ 215:     useState<CreateServiceFormState>(INITIAL_SERVICE_FORM);
+ 216:   const [isCreatingService, setIsCreatingService] = useState(false);
+ 217: 
+ 218:   const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceDraft>>({});
+ 219:   const [savingServiceId, setSavingServiceId] = useState<string | null>(null);
+ 220:   const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
+ 221:   const [servicePendingDelete, setServicePendingDelete] = useState<IncidentService | null>(null);
+ 222: 
+ 223:   const [timelineDrafts, setTimelineDrafts] = useState<Record<string, IncidentTimelineDraft>>({});
+ 224:   const [postingUpdateId, setPostingUpdateId] = useState<string | null>(null);
+ 225: 
+ 226:   const canManage = useMemo(() => {
+ 227:     const role = data?.currentUserRole;
+ 228:     return role === "admin" || role === "manager" || role === "support";
+ 229:   }, [data?.currentUserRole]);
+ 230: 
+ 231:   const loadIncidents = useCallback(async () => {
+ 232:     if (!activeOrgId) {
+ 233:       setData(null);
+ 234:       setError(null);
+ 235:       setIsLoading(false);
+ 236:       return;
+ 237:     }
+ 238: 
+ 239:     setIsLoading(true);
+ 240:     setError(null);
+ 241:     try {
+ 242:       const response = await fetch("/api/incidents", {
+ 243:         method: "GET",
+ 244:         cache: "no-store",
+ 245:       });
+ 246:       if (!response.ok) {
+ 247:         throw new Error(await readApiError(response));
+ 248:       }
+ 249: 
+ 250:       const payload = (await response.json()) as IncidentsResponse;
+ 251:       setData(payload);
+ 252: 
+ 253:       setServiceDrafts(() => {
+ 254:         const next: Record<string, ServiceDraft> = {};
+ 255:         for (const service of payload.services) {
+ 256:           next[service.id] = {
+ 257:             name: service.name,
+ 258:             description: service.description ?? "",
+ 259:             currentStatus: service.current_status,
+ 260:             isPublic: service.is_public,
+ 261:             displayOrder: service.display_order,
+ 262:           };
+ 263:         }
+ 264:         return next;
+ 265:       });
+ 266: 
+ 267:       setTimelineDrafts((previous) => {
+ 268:         const next: Record<string, IncidentTimelineDraft> = {};
+ 269:         for (const incident of payload.incidents) {
+ 270:           next[incident.id] = previous[incident.id] ?? {
+ 271:             message: "",
+ 272:             status: incident.status,
+ 273:             isPublic: incident.is_public,
+ 274:           };
+ 275:         }
+ 276:         return next;
+ 277:       });
+ 278:     } catch (err: unknown) {
+ 279:       const message = err instanceof Error ? err.message : "Failed to load incidents";
+ 280:       setError(message);
+ 281:       setData(null);
+ 282:     } finally {
+ 283:       setIsLoading(false);
+ 284:     }
+ 285:   }, [activeOrgId]);
+ 286: 
+ 287:   useEffect(() => {
+ 288:     void loadIncidents();
+ 289:   }, [loadIncidents]);
+ 290: 
+ 291:   const handleImpactToggle = (serviceId: string, isSelected: boolean) => {
+ 292:     setSelectedImpacts((prev) => {
+ 293:       if (!isSelected) {
+ 294:         const next = { ...prev };
+ 295:         delete next[serviceId];
+ 296:         return next;
+ 297:       }
+ 298:       if (prev[serviceId]) {
+ 299:         return prev;
+ 300:       }
+ 301:       return {
+ 302:         ...prev,
+ 303:         [serviceId]: defaultImpactForSeverity(createIncidentForm.severity),
+ 304:       };
+ 305:     });
+ 306:   };
+ 307: 
+ 308:   const handleCreateService = async (event: FormEvent<HTMLFormElement>) => {
+ 309:     event.preventDefault();
+ 310:     if (!canManage || isCreatingService) {
+ 311:       return;
+ 312:     }
+ 313: 
+ 314:     const normalizedName = createServiceForm.name.trim();
+ 315:     if (!normalizedName) {
+ 316:       toast.error("Service name is required");
+ 317:       return;
+ 318:     }
+ 319: 
+ 320:     setIsCreatingService(true);
+ 321:     try {
+ 322:       const response = await fetch("/api/incidents/services", {
+ 323:         method: "POST",
+ 324:         headers: { "Content-Type": "application/json" },
+ 325:         body: JSON.stringify({
+ 326:           name: normalizedName,
+ 327:           description: createServiceForm.description.trim() || null,
+ 328:           currentStatus: createServiceForm.currentStatus,
+ 329:           isPublic: createServiceForm.isPublic,
+ 330:           displayOrder: createServiceForm.displayOrder,
+ 331:         }),
+ 332:       });
+ 333: 
+ 334:       if (!response.ok) {
+ 335:         throw new Error(await readApiError(response));
+ 336:       }
+ 337: 
+ 338:       toast.success("Service created");
+ 339:       setCreateServiceForm(INITIAL_SERVICE_FORM);
+ 340:       await loadIncidents();
+ 341:     } catch (err: unknown) {
+ 342:       const message = err instanceof Error ? err.message : "Failed to create service";
+ 343:       toast.error(message);
+ 344:     } finally {
+ 345:       setIsCreatingService(false);
+ 346:     }
+ 347:   };
+ 348: 
+ 349:   const handleSaveService = async (service: IncidentService) => {
+ 350:     if (!canManage || savingServiceId) {
+ 351:       return;
+ 352:     }
+ 353:     const draft = serviceDrafts[service.id];
+ 354:     if (!draft) {
+ 355:       return;
+ 356:     }
+ 357: 
+ 358:     const patch: Record<string, unknown> = {};
+ 359:     const normalizedName = draft.name.trim();
+ 360:     const normalizedDescription = draft.description.trim();
+ 361: 
+ 362:     if (normalizedName !== service.name) {
+ 363:       patch.name = normalizedName;
+ 364:     }
+ 365:     if ((normalizedDescription || null) !== (service.description ?? null)) {
+ 366:       patch.description = normalizedDescription || null;
+ 367:     }
+ 368:     if (draft.currentStatus !== service.current_status) {
+ 369:       patch.currentStatus = draft.currentStatus;
+ 370:     }
+ 371:     if (draft.isPublic !== service.is_public) {
+ 372:       patch.isPublic = draft.isPublic;
+ 373:     }
+ 374:     if (draft.displayOrder !== service.display_order) {
+ 375:       patch.displayOrder = draft.displayOrder;
+ 376:     }
+ 377: 
+ 378:     if (!Object.keys(patch).length) {
+ 379:       toast.message("No service changes to save");
+ 380:       return;
+ 381:     }
+ 382: 
+ 383:     setSavingServiceId(service.id);
+ 384:     try {
+ 385:       const response = await fetch(`/api/incidents/services/${service.id}`, {
+ 386:         method: "PATCH",
+ 387:         headers: { "Content-Type": "application/json" },
+ 388:         body: JSON.stringify(patch),
+ 389:       });
+ 390: 
+ 391:       if (!response.ok) {
+ 392:         throw new Error(await readApiError(response));
+ 393:       }
+ 394: 
+ 395:       toast.success("Service updated");
+ 396:       await loadIncidents();
+ 397:     } catch (err: unknown) {
+ 398:       const message = err instanceof Error ? err.message : "Failed to update service";
+ 399:       toast.error(message);
+ 400:     } finally {
+ 401:       setSavingServiceId(null);
+ 402:     }
+ 403:   };
+ 404: 
+ 405:   const handleDeleteService = async () => {
+ 406:     if (!canManage || !servicePendingDelete || deletingServiceId) {
+ 407:       return;
+ 408:     }
+ 409:     const service = servicePendingDelete;
+ 410:     setDeletingServiceId(service.id);
+ 411:     try {
+ 412:       const response = await fetch(`/api/incidents/services/${service.id}`, {
+ 413:         method: "DELETE",
+ 414:       });
+ 415:       if (!response.ok) {
+ 416:         throw new Error(await readApiError(response));
+ 417:       }
+ 418:       toast.success(`Service "${service.name}" deleted`);
+ 419:       setServicePendingDelete(null);
+ 420:       await loadIncidents();
+ 421:     } catch (err: unknown) {
+ 422:       const message = err instanceof Error ? err.message : "Failed to delete service";
+ 423:       toast.error(message);
+ 424:     } finally {
+ 425:       setDeletingServiceId(null);
+ 426:     }
+ 427:   };
+ 428: 
+ 429:   const handleCreateIncident = async (event: FormEvent<HTMLFormElement>) => {
+ 430:     event.preventDefault();
+ 431:     if (!canManage || isCreatingIncident) {
+ 432:       return;
+ 433:     }
+ 434: 
+ 435:     const title = createIncidentForm.title.trim();
+ 436:     if (!title) {
+ 437:       toast.error("Incident title is required");
+ 438:       return;
+ 439:     }
+ 440: 
+ 441:     const serviceImpacts = Object.entries(selectedImpacts).map(([serviceId, impactLevel]) => ({
+ 442:       serviceId,
+ 443:       impactLevel,
+ 444:     }));
+ 445: 
+ 446:     setIsCreatingIncident(true);
+ 447:     try {
+ 448:       const response = await fetch("/api/incidents", {
+ 449:         method: "POST",
+ 450:         headers: { "Content-Type": "application/json" },
+ 451:         body: JSON.stringify({
+ 452:           title,
+ 453:           summary: createIncidentForm.summary.trim() || null,
+ 454:           status: createIncidentForm.status,
+ 455:           severity: createIncidentForm.severity,
+ 456:           isPublic: createIncidentForm.isPublic,
+ 457:           serviceImpacts,
+ 458:           initialMessage: createIncidentForm.initialMessage.trim() || undefined,
+ 459:           initialUpdatePublic: createIncidentForm.isPublic,
+ 460:         }),
+ 461:       });
+ 462: 
+ 463:       if (!response.ok) {
+ 464:         throw new Error(await readApiError(response));
+ 465:       }
+ 466: 
+ 467:       toast.success("Incident created");
+ 468:       setCreateIncidentForm(INITIAL_INCIDENT_FORM);
+ 469:       setSelectedImpacts({});
+ 470:       await loadIncidents();
+ 471:     } catch (err: unknown) {
+ 472:       const message = err instanceof Error ? err.message : "Failed to create incident";
+ 473:       toast.error(message);
+ 474:     } finally {
+ 475:       setIsCreatingIncident(false);
+ 476:     }
+ 477:   };
+ 478: 
+ 479:   const handlePostTimelineUpdate = async (incident: IncidentItem) => {
+ 480:     if (!canManage || postingUpdateId) {
+ 481:       return;
+ 482:     }
+ 483: 
+ 484:     const draft = timelineDrafts[incident.id] ?? {
+ 485:       message: "",
+ 486:       status: incident.status,
+ 487:       isPublic: incident.is_public,
+ 488:     };
+ 489: 
+ 490:     if (!draft.message.trim() && draft.status === incident.status) {
+ 491:       toast.error("Write a message or change status before posting");
+ 492:       return;
+ 493:     }
+ 494: 
+ 495:     setPostingUpdateId(incident.id);
+ 496:     try {
+ 497:       const response = await fetch(`/api/incidents/${incident.id}/updates`, {
+ 498:         method: "POST",
+ 499:         headers: { "Content-Type": "application/json" },
+ 500:         body: JSON.stringify({
+ 501:           message: draft.message.trim() || undefined,
+ 502:           status: draft.status,
+ 503:           isPublic: draft.isPublic,
+ 504:         }),
+ 505:       });
+ 506: 
+ 507:       if (!response.ok) {
+ 508:         throw new Error(await readApiError(response));
+ 509:       }
+ 510: 
+ 511:       toast.success("Incident timeline updated");
+ 512:       setTimelineDrafts((prev) => ({
+ 513:         ...prev,
+ 514:         [incident.id]: {
+ 515:           ...draft,
+ 516:           message: "",
+ 517:         },
+ 518:       }));
+ 519:       await loadIncidents();
+ 520:     } catch (err: unknown) {
+ 521:       const message = err instanceof Error ? err.message : "Failed to post incident update";
+ 522:       toast.error(message);
+ 523:     } finally {
+ 524:       setPostingUpdateId(null);
+ 525:     }
+ 526:   };
+ 527: 
+ 528:   const activeIncidents = useMemo(
+ 529:     () => (data?.incidents ?? []).filter((incident) => incident.status !== "resolved"),
+ 530:     [data?.incidents],
+ 531:   );
+ 532: 
+ 533:   const resolvedIncidents = useMemo(
+ 534:     () => (data?.incidents ?? []).filter((incident) => incident.status === "resolved"),
+ 535:     [data?.incidents],
+ 536:   );
+ 537: 
+ 538:   if (!activeOrgId) {
+ 539:     return (
+ 540:       <div className="space-y-4 p-6">
+ 541:         <Card>
+ 542:           <CardContent className="p-6 text-muted-foreground">
+ 543:             Select or create an organization to manage incidents.
+ 544:           </CardContent>
+ 545:         </Card>
+ 546:       </div>
+ 547:     );
+ 548:   }
+ 549: 
+ 550:   return (
+ 551:     <div className="space-y-6 p-6">
+ 552:       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+ 553:         <div className="space-y-1">
+ 554:           <h1 className="text-3xl font-semibold text-foreground">Incident Management</h1>
+ 555:           <p className="text-muted-foreground">
+ 556:             Create incidents, manage impacted services, and publish timeline updates.
+ 557:           </p>
+ 558:           {data?.organizationSlug ? (
+ 559:             <p className="text-sm text-muted-foreground">
+ 560:               Public status page:{" "}
+ 561:               <Link
+ 562:                 href={`/status/${data.organizationSlug}`}
+ 563:                 className="font-medium text-foreground underline decoration-border underline-offset-2"
+ 564:                 target="_blank"
+ 565:                 rel="noreferrer"
+ 566:               >
+ 567:                 /status/{data.organizationSlug}
+ 568:               </Link>
+ 569:             </p>
+ 570:           ) : null}
+ 571:         </div>
+ 572:         <div className="flex items-center gap-2">
+ 573:           {data?.organizationSlug ? (
+ 574:             <Button asChild variant="outline" className="gap-2">
+ 575:               <Link href={`/status/${data.organizationSlug}`} target="_blank" rel="noreferrer">
+ 576:                 <Globe className="h-4 w-4" />
+ 577:                 Open Public Status
+ 578:               </Link>
+ 579:             </Button>
+ 580:           ) : null}
+ 581:           <Button variant="outline" className="gap-2" onClick={() => void loadIncidents()}>
+ 582:             <RefreshCcw className="h-4 w-4" />
+ 583:             Refresh
+ 584:           </Button>
+ 585:         </div>
+ 586:       </div>
+ 587: 
+ 588:       {!canManage && data ? (
+ 589:         <Card className="border-amber-200 bg-amber-50">
+ 590:           <CardContent className="py-4 text-sm text-amber-800">
+ 591:             You have view-only access. Contact an admin or manager to edit incidents and services.
+ 592:           </CardContent>
+ 593:         </Card>
+ 594:       ) : null}
+ 595: 
+ 596:       {error ? (
+ 597:         <Card className="border-red-200 bg-red-50">
+ 598:           <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700">
+ 599:             <AlertTriangle className="h-4 w-4" />
+ 600:             {error}
+ 601:           </CardContent>
+ 602:         </Card>
+ 603:       ) : null}
+ 604: 
+ 605:       {isLoading ? (
+ 606:         <Card>
+ 607:           <CardContent className="flex items-center gap-2 py-8 text-muted-foreground">
+ 608:             <Loader2 className="h-4 w-4 animate-spin" />
+ 609:             Loading incidents...
+ 610:           </CardContent>
+ 611:         </Card>
+ 612:       ) : null}
+ 613: 
+ 614:       {data ? (
+ 615:         <>
+ 616:           <Card>
+ 617:             <CardHeader>
+ 618:               <CardTitle>Status Services</CardTitle>
+ 619:               <CardDescription>
+ 620:                 Define what appears on the public status page and current service health.
+ 621:               </CardDescription>
+ 622:             </CardHeader>
+ 623:             <CardContent className="space-y-6">
+ 624:               {canManage ? (
+ 625:                 <form className="grid grid-cols-1 gap-3 rounded-lg border border-border p-4 md:grid-cols-2 xl:grid-cols-6" onSubmit={handleCreateService}>
+ 626:                   <div className="space-y-2 xl:col-span-2">
+ 627:                     <Label htmlFor="service-name">Service Name</Label>
+ 628:                     <Input
+ 629:                       id="service-name"
+ 630:                       value={createServiceForm.name}
+ 631:                       onChange={(event) =>
+ 632:                         setCreateServiceForm((prev) => ({ ...prev, name: event.target.value }))
+ 633:                       }
+ 634:                       placeholder="API Gateway"
+ 635:                       disabled={isCreatingService}
+ 636:                     />
+ 637:                   </div>
+ 638:                   <div className="space-y-2 xl:col-span-2">
+ 639:                     <Label htmlFor="service-description">Description</Label>
+ 640:                     <Input
+ 641:                       id="service-description"
+ 642:                       value={createServiceForm.description}
+ 643:                       onChange={(event) =>
+ 644:                         setCreateServiceForm((prev) => ({
+ 645:                           ...prev,
+ 646:                           description: event.target.value,
+ 647:                         }))
+ 648:                       }
+ 649:                       placeholder="Public API and auth edge"
+ 650:                       disabled={isCreatingService}
+ 651:                     />
+ 652:                   </div>
+ 653:                   <div className="space-y-2">
+ 654:                     <Label>Status</Label>
+ 655:                     <Select
+ 656:                       value={createServiceForm.currentStatus}
+ 657:                       onValueChange={(value) =>
+ 658:                         setCreateServiceForm((prev) => ({
+ 659:                           ...prev,
+ 660:                           currentStatus: value as IncidentServiceHealth,
+ 661:                         }))
+ 662:                       }
+ 663:                     >
+ 664:                       <SelectTrigger>
+ 665:                         <SelectValue />
+ 666:                       </SelectTrigger>
+ 667:                       <SelectContent>
+ 668:                         {SERVICE_HEALTH_OPTIONS.map((status) => (
+ 669:                           <SelectItem key={status} value={status}>
+ 670:                             {toLabel(status)}
+ 671:                           </SelectItem>
+ 672:                         ))}
+ 673:                       </SelectContent>
+ 674:                     </Select>
+ 675:                   </div>
+ 676:                   <div className="space-y-2">
+ 677:                     <Label htmlFor="service-order">Display Order</Label>
+ 678:                     <Input
+ 679:                       id="service-order"
+ 680:                       type="number"
+ 681:                       value={createServiceForm.displayOrder}
+ 682:                       onChange={(event) =>
+ 683:                         setCreateServiceForm((prev) => ({
+ 684:                           ...prev,
+ 685:                           displayOrder: Number(event.target.value || "0"),
+ 686:                         }))
+ 687:                       }
+ 688:                       disabled={isCreatingService}
+ 689:                     />
+ 690:                   </div>
+ 691:                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 md:col-span-2 xl:col-span-3">
+ 692:                     <div>
+ 693:                       <p className="text-sm font-medium text-foreground">Show on public page</p>
+ 694:                       <p className="text-xs text-muted-foreground">Hide internal-only services</p>
+ 695:                     </div>
+ 696:                     <Switch
+ 697:                       checked={createServiceForm.isPublic}
+ 698:                       onCheckedChange={(checked) =>
+ 699:                         setCreateServiceForm((prev) => ({ ...prev, isPublic: checked }))
+ 700:                       }
+ 701:                       disabled={isCreatingService}
+ 702:                     />
+ 703:                   </div>
+ 704:                   <div className="md:col-span-2 xl:col-span-3">
+ 705:                     <Button type="submit" className="w-full gap-2" disabled={isCreatingService}>
+ 706:                       {isCreatingService ? (
+ 707:                         <Loader2 className="h-4 w-4 animate-spin" />
+ 708:                       ) : (
+ 709:                         <Plus className="h-4 w-4" />
+ 710:                       )}
+ 711:                       Add Service
+ 712:                     </Button>
+ 713:                   </div>
+ 714:                 </form>
+ 715:               ) : null}
+ 716: 
+ 717:               {data.services.length === 0 ? (
+ 718:                 <p className="text-sm text-muted-foreground">No services added yet.</p>
+ 719:               ) : (
+ 720:                 <div className="space-y-3">
+ 721:                   {data.services.map((service) => {
+ 722:                     const draft = serviceDrafts[service.id];
+ 723:                     if (!draft) {
+ 724:                       return null;
+ 725:                     }
+ 726:                     return (
+ 727:                       <div
+ 728:                         key={service.id}
+ 729:                         className="rounded-lg border border-border bg-background p-4"
+ 730:                       >
+ 731:                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+ 732:                           <div className="space-y-2 xl:col-span-2">
+ 733:                             <Label>Name</Label>
+ 734:                             <Input
+ 735:                               value={draft.name}
+ 736:                               onChange={(event) =>
+ 737:                                 setServiceDrafts((prev) => ({
+ 738:                                   ...prev,
+ 739:                                   [service.id]: { ...draft, name: event.target.value },
+ 740:                                 }))
+ 741:                               }
+ 742:                               disabled={!canManage || savingServiceId === service.id}
+ 743:                             />
+ 744:                           </div>
+ 745:                           <div className="space-y-2 xl:col-span-2">
+ 746:                             <Label>Description</Label>
+ 747:                             <Input
+ 748:                               value={draft.description}
+ 749:                               onChange={(event) =>
+ 750:                                 setServiceDrafts((prev) => ({
+ 751:                                   ...prev,
+ 752:                                   [service.id]: { ...draft, description: event.target.value },
+ 753:                                 }))
+ 754:                               }
+ 755:                               disabled={!canManage || savingServiceId === service.id}
+ 756:                             />
+ 757:                           </div>
+ 758:                           <div className="space-y-2">
+ 759:                             <Label>Health</Label>
+ 760:                             <Select
+ 761:                               value={draft.currentStatus}
+ 762:                               onValueChange={(value) =>
+ 763:                                 setServiceDrafts((prev) => ({
+ 764:                                   ...prev,
+ 765:                                   [service.id]: {
+ 766:                                     ...draft,
+ 767:                                     currentStatus: value as IncidentServiceHealth,
+ 768:                                   },
+ 769:                                 }))
+ 770:                               }
+ 771:                               disabled={!canManage || savingServiceId === service.id}
+ 772:                             >
+ 773:                               <SelectTrigger>
+ 774:                                 <SelectValue />
+ 775:                               </SelectTrigger>
+ 776:                               <SelectContent>
+ 777:                                 {SERVICE_HEALTH_OPTIONS.map((status) => (
+ 778:                                   <SelectItem key={status} value={status}>
+ 779:                                     {toLabel(status)}
+ 780:                                   </SelectItem>
+ 781:                                 ))}
+ 782:                               </SelectContent>
+ 783:                             </Select>
+ 784:                           </div>
+ 785:                           <div className="space-y-2">
+ 786:                             <Label>Display Order</Label>
+ 787:                             <Input
+ 788:                               type="number"
+ 789:                               value={draft.displayOrder}
+ 790:                               onChange={(event) =>
+ 791:                                 setServiceDrafts((prev) => ({
+ 792:                                   ...prev,
+ 793:                                   [service.id]: {
+ 794:                                     ...draft,
+ 795:                                     displayOrder: Number(event.target.value || "0"),
+ 796:                                   },
+ 797:                                 }))
+ 798:                               }
+ 799:                               disabled={!canManage || savingServiceId === service.id}
+ 800:                             />
+ 801:                           </div>
+ 802:                         </div>
+ 803: 
+ 804:                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+ 805:                           <div className="flex flex-wrap items-center gap-2">
+ 806:                             <Badge className={healthBadgeClass(draft.currentStatus)}>
+ 807:                               {toLabel(draft.currentStatus)}
+ 808:                             </Badge>
+ 809:                             <Badge variant="outline">
+ 810:                               {draft.isPublic ? "Public" : "Internal"}
+ 811:                             </Badge>
+ 812:                             <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
+ 813:                               <Switch
+ 814:                                 checked={draft.isPublic}
+ 815:                                 onCheckedChange={(checked) =>
+ 816:                                   setServiceDrafts((prev) => ({
+ 817:                                     ...prev,
+ 818:                                     [service.id]: { ...draft, isPublic: checked },
+ 819:                                   }))
+ 820:                                 }
+ 821:                                 disabled={!canManage || savingServiceId === service.id}
+ 822:                               />
+ 823:                               <span className="text-xs text-muted-foreground">Public status</span>
+ 824:                             </div>
+ 825:                           </div>
+ 826:                           {canManage ? (
+ 827:                             <div className="flex items-center gap-2">
+ 828:                               <Button
+ 829:                                 variant="outline"
+ 830:                                 className="gap-2"
+ 831:                                 onClick={() => void handleSaveService(service)}
+ 832:                                 disabled={savingServiceId === service.id}
+ 833:                               >
+ 834:                                 {savingServiceId === service.id ? (
+ 835:                                   <Loader2 className="h-4 w-4 animate-spin" />
+ 836:                                 ) : (
+ 837:                                   <Save className="h-4 w-4" />
+ 838:                                 )}
+ 839:                                 Save
+ 840:                               </Button>
+ 841:                               <Button
+ 842:                                 variant="destructive"
+ 843:                                 className="gap-2"
+ 844:                                 onClick={() => setServicePendingDelete(service)}
+ 845:                               >
+ 846:                                 <Trash2 className="h-4 w-4" />
+ 847:                                 Delete
+ 848:                               </Button>
+ 849:                             </div>
+ 850:                           ) : null}
+ 851:                         </div>
+ 852:                       </div>
+ 853:                     );
+ 854:                   })}
+ 855:                 </div>
+ 856:               )}
+ 857:             </CardContent>
+ 858:           </Card>
+ 859: 
+ 860:           {canManage ? (
+ 861:             <Card>
+ 862:               <CardHeader>
+ 863:                 <CardTitle>Create Incident</CardTitle>
+ 864:                 <CardDescription>
+ 865:                   Declare a new incident and choose which services are impacted.
+ 866:                 </CardDescription>
+ 867:               </CardHeader>
+ 868:               <CardContent>
+ 869:                 <form className="space-y-4" onSubmit={handleCreateIncident}>
+ 870:                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+ 871:                     <div className="space-y-2 md:col-span-2">
+ 872:                       <Label htmlFor="incident-title">Title</Label>
+ 873:                       <Input
+ 874:                         id="incident-title"
+ 875:                         value={createIncidentForm.title}
+ 876:                         onChange={(event) =>
+ 877:                           setCreateIncidentForm((prev) => ({ ...prev, title: event.target.value }))
+ 878:                         }
+ 879:                         placeholder="API latency spike in EU region"
+ 880:                         disabled={isCreatingIncident}
+ 881:                       />
+ 882:                     </div>
+ 883:                     <div className="space-y-2 md:col-span-2">
+ 884:                       <Label htmlFor="incident-summary">Summary</Label>
+ 885:                       <Textarea
+ 886:                         id="incident-summary"
+ 887:                         value={createIncidentForm.summary}
+ 888:                         onChange={(event) =>
+ 889:                           setCreateIncidentForm((prev) => ({
+ 890:                             ...prev,
+ 891:                             summary: event.target.value,
+ 892:                           }))
+ 893:                         }
+ 894:                         rows={2}
+ 895:                         placeholder="Describe what users are seeing."
+ 896:                         disabled={isCreatingIncident}
+ 897:                       />
+ 898:                     </div>
+ 899:                     <div className="space-y-2">
+ 900:                       <Label>Status</Label>
+ 901:                       <Select
+ 902:                         value={createIncidentForm.status}
+ 903:                         onValueChange={(value) =>
+ 904:                           setCreateIncidentForm((prev) => ({
+ 905:                             ...prev,
+ 906:                             status: value as IncidentStatus,
+ 907:                           }))
+ 908:                         }
+ 909:                         disabled={isCreatingIncident}
+ 910:                       >
+ 911:                         <SelectTrigger>
+ 912:                           <SelectValue />
+ 913:                         </SelectTrigger>
+ 914:                         <SelectContent>
+ 915:                           {INCIDENT_STATUS_OPTIONS.map((status) => (
+ 916:                             <SelectItem key={status} value={status}>
+ 917:                               {toLabel(status)}
+ 918:                             </SelectItem>
+ 919:                           ))}
+ 920:                         </SelectContent>
+ 921:                       </Select>
+ 922:                     </div>
+ 923:                     <div className="space-y-2">
+ 924:                       <Label>Severity</Label>
+ 925:                       <Select
+ 926:                         value={createIncidentForm.severity}
+ 927:                         onValueChange={(value) => {
+ 928:                           const nextSeverity = value as IncidentSeverity;
+ 929:                           setCreateIncidentForm((prev) => ({
+ 930:                             ...prev,
+ 931:                             severity: nextSeverity,
+ 932:                           }));
+ 933:                           setSelectedImpacts((prev) => {
+ 934:                             const next: Record<string, IncidentServiceHealth> = {};
+ 935:                             for (const [serviceId, impact] of Object.entries(prev)) {
+ 936:                               next[serviceId] =
+ 937:                                 impact || defaultImpactForSeverity(nextSeverity);
+ 938:                             }
+ 939:                             return next;
+ 940:                           });
+ 941:                         }}
+ 942:                         disabled={isCreatingIncident}
+ 943:                       >
+ 944:                         <SelectTrigger>
+ 945:                           <SelectValue />
+ 946:                         </SelectTrigger>
+ 947:                         <SelectContent>
+ 948:                           {INCIDENT_SEVERITY_OPTIONS.map((severity) => (
+ 949:                             <SelectItem key={severity} value={severity}>
+ 950:                               {toLabel(severity)}
+ 951:                             </SelectItem>
+ 952:                           ))}
+ 953:                         </SelectContent>
+ 954:                       </Select>
+ 955:                     </div>
+ 956:                     <div className="space-y-2 md:col-span-2">
+ 957:                       <Label htmlFor="initial-message">Initial Timeline Update</Label>
+ 958:                       <Textarea
+ 959:                         id="initial-message"
+ 960:                         rows={2}
+ 961:                         value={createIncidentForm.initialMessage}
+ 962:                         onChange={(event) =>
+ 963:                           setCreateIncidentForm((prev) => ({
+ 964:                             ...prev,
+ 965:                             initialMessage: event.target.value,
+ 966:                           }))
+ 967:                         }
+ 968:                         placeholder="Investigating elevated error rate for checkout API."
+ 969:                         disabled={isCreatingIncident}
+ 970:                       />
+ 971:                     </div>
+ 972:                     <div className="rounded-md border border-border px-3 py-2 md:col-span-2">
+ 973:                       <div className="flex items-center justify-between gap-3">
+ 974:                         <div>
+ 975:                           <p className="text-sm font-medium text-foreground">Public incident</p>
+ 976:                           <p className="text-xs text-muted-foreground">
+ 977:                             Publish this incident and updates to the public status page.
+ 978:                           </p>
+ 979:                         </div>
+ 980:                         <Switch
+ 981:                           checked={createIncidentForm.isPublic}
+ 982:                           onCheckedChange={(checked) =>
+ 983:                             setCreateIncidentForm((prev) => ({ ...prev, isPublic: checked }))
+ 984:                           }
+ 985:                           disabled={isCreatingIncident}
+ 986:                         />
+ 987:                       </div>
+ 988:                     </div>
+ 989:                   </div>
+ 990: 
+ 991:                   <div className="space-y-3">
+ 992:                     <Label>Impacted Services</Label>
+ 993:                     {data.services.length === 0 ? (
+ 994:                       <p className="text-sm text-muted-foreground">
+ 995:                         Add at least one service before declaring incident impacts.
+ 996:                       </p>
+ 997:                     ) : (
+ 998:                       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+ 999:                         {data.services.map((service) => {
+1000:                           const selected = Boolean(selectedImpacts[service.id]);
+1001:                           return (
+1002:                             <div
+1003:                               key={service.id}
+1004:                               className="rounded-md border border-border p-3"
+1005:                             >
+1006:                               <div className="flex items-center justify-between gap-2">
+1007:                                 <div className="flex items-center gap-2">
+1008:                                   <Checkbox
+1009:                                     id={`impact-${service.id}`}
+1010:                                     checked={selected}
+1011:                                     onCheckedChange={(checked) =>
+1012:                                       handleImpactToggle(service.id, Boolean(checked))
+1013:                                     }
+1014:                                     disabled={isCreatingIncident}
+1015:                                   />
+1016:                                   <Label
+1017:                                     htmlFor={`impact-${service.id}`}
+1018:                                     className="cursor-pointer font-medium"
+1019:                                   >
+1020:                                     {service.name}
+1021:                                   </Label>
+1022:                                 </div>
+1023:                                 <Badge className={healthBadgeClass(service.current_status)}>
+1024:                                   {toLabel(service.current_status)}
+1025:                                 </Badge>
+1026:                               </div>
+1027:                               {selected ? (
+1028:                                 <div className="mt-2">
+1029:                                   <Select
+1030:                                     value={selectedImpacts[service.id]}
+1031:                                     onValueChange={(value) =>
+1032:                                       setSelectedImpacts((prev) => ({
+1033:                                         ...prev,
+1034:                                         [service.id]: value as IncidentServiceHealth,
+1035:                                       }))
+1036:                                     }
+1037:                                     disabled={isCreatingIncident}
+1038:                                   >
+1039:                                     <SelectTrigger>
+1040:                                       <SelectValue />
+1041:                                     </SelectTrigger>
+1042:                                     <SelectContent>
+1043:                                       {IMPACT_LEVEL_OPTIONS.map((impactLevel) => (
+1044:                                         <SelectItem key={impactLevel} value={impactLevel}>
+1045:                                           {toLabel(impactLevel)}
+1046:                                         </SelectItem>
+1047:                                       ))}
+1048:                                     </SelectContent>
+1049:                                   </Select>
+1050:                                 </div>
+1051:                               ) : null}
+1052:                             </div>
+1053:                           );
+1054:                         })}
+1055:                       </div>
+1056:                     )}
+1057:                   </div>
+1058: 
+1059:                   <Button type="submit" className="gap-2" disabled={isCreatingIncident}>
+1060:                     {isCreatingIncident ? (
+1061:                       <Loader2 className="h-4 w-4 animate-spin" />
+1062:                     ) : (
+1063:                       <Plus className="h-4 w-4" />
+1064:                     )}
+1065:                     Declare Incident
+1066:                   </Button>
+1067:                 </form>
+1068:               </CardContent>
+1069:             </Card>
+1070:           ) : null}
+1071: 
+1072:           <Card>
+1073:             <CardHeader>
+1074:               <CardTitle>Active Incidents</CardTitle>
+1075:               <CardDescription>
+1076:                 {activeIncidents.length > 0
+1077:                   ? "Live incidents and latest timeline updates."
+1078:                   : "No active incidents right now."}
+1079:               </CardDescription>
+1080:             </CardHeader>
+1081:             <CardContent className="space-y-4">
+1082:               {activeIncidents.length === 0 ? (
+1083:                 <p className="text-sm text-muted-foreground">No active incidents.</p>
+1084:               ) : (
+1085:                 activeIncidents.map((incident) => {
+1086:                   const timelineDraft = timelineDrafts[incident.id] ?? {
+1087:                     message: "",
+1088:                     status: incident.status,
+1089:                     isPublic: incident.is_public,
+1090:                   };
+1091:                   return (
+1092:                     <div key={incident.id} className="rounded-lg border border-border bg-background p-4">
+1093:                       <div className="flex flex-wrap items-start justify-between gap-2">
+1094:                         <div>
+1095:                           <p className="font-semibold text-foreground">{incident.title}</p>
+1096:                           <p className="mt-1 text-xs text-muted-foreground">
+1097:                             Started {formatDateTime(incident.started_at)}
+1098:                           </p>
+1099:                         </div>
+1100:                         <div className="flex flex-wrap items-center gap-2">
+1101:                           <Badge className={statusBadgeClass(incident.status)}>
+1102:                             {toLabel(incident.status)}
+1103:                           </Badge>
+1104:                           <Badge className={severityBadgeClass(incident.severity)}>
+1105:                             {toLabel(incident.severity)}
+1106:                           </Badge>
+1107:                           <Badge variant="outline">{incident.is_public ? "Public" : "Internal"}</Badge>
+1108:                         </div>
+1109:                       </div>
+1110: 
+1111:                       {incident.summary ? (
+1112:                         <p className="mt-3 text-sm text-foreground">{incident.summary}</p>
+1113:                       ) : null}
+1114: 
+1115:                       {incident.impacts.length > 0 ? (
+1116:                         <div className="mt-3 flex flex-wrap gap-2">
+1117:                           {incident.impacts.map((impact) => (
+1118:                             <Badge
+1119:                               key={impact.id}
+1120:                               className={healthBadgeClass(impact.impact_level)}
+1121:                             >
+1122:                               {(impact.service?.name ?? "Unknown Service")} - {toLabel(impact.impact_level)}
+1123:                             </Badge>
+1124:                           ))}
+1125:                         </div>
+1126:                       ) : (
+1127:                         <p className="mt-3 text-xs text-muted-foreground">No impacted services linked.</p>
+1128:                       )}
+1129: 
+1130:                       <div className="mt-4 space-y-2">
+1131:                         {incident.updates.length === 0 ? (
+1132:                           <p className="text-sm text-muted-foreground">No timeline updates yet.</p>
+1133:                         ) : (
+1134:                           incident.updates.map((update) => (
+1135:                             <div
+1136:                               key={update.id}
+1137:                               className="rounded-md border border-border bg-muted/50 p-3"
+1138:                             >
+1139:                               <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+1140:                                 <span>{formatDateTime(update.created_at)}</span>
+1141:                                 {update.status ? <span>| {toLabel(update.status)}</span> : null}
+1142:                                 {update.is_public ? <span>| Public</span> : <span>| Internal</span>}
+1143:                               </div>
+1144:                               <p className="text-sm text-foreground">{update.message}</p>
+1145:                             </div>
+1146:                           ))
+1147:                         )}
+1148:                       </div>
+1149: 
+1150:                       {canManage ? (
+1151:                         <div className="mt-4 rounded-md border border-border p-3">
+1152:                           <p className="mb-2 text-sm font-medium text-foreground">Add Timeline Update</p>
+1153:                           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+1154:                             <div className="space-y-2">
+1155:                               <Label>Status</Label>
+1156:                               <Select
+1157:                                 value={timelineDraft.status}
+1158:                                 onValueChange={(value) =>
+1159:                                   setTimelineDrafts((prev) => ({
+1160:                                     ...prev,
+1161:                                     [incident.id]: {
+1162:                                       ...timelineDraft,
+1163:                                       status: value as IncidentStatus,
+1164:                                     },
+1165:                                   }))
+1166:                                 }
+1167:                                 disabled={postingUpdateId === incident.id}
+1168:                               >
+1169:                                 <SelectTrigger>
+1170:                                   <SelectValue />
+1171:                                 </SelectTrigger>
+1172:                                 <SelectContent>
+1173:                                   {INCIDENT_STATUS_OPTIONS.map((status) => (
+1174:                                     <SelectItem key={status} value={status}>
+1175:                                       {toLabel(status)}
+1176:                                     </SelectItem>
+1177:                                   ))}
+1178:                                 </SelectContent>
+1179:                               </Select>
+1180:                             </div>
+1181:                             <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 lg:col-span-2">
+1182:                               <div>
+1183:                                 <p className="text-sm font-medium text-foreground">Public update</p>
+1184:                                 <p className="text-xs text-muted-foreground">
+1185:                                   Visible on external status page when enabled.
+1186:                                 </p>
+1187:                               </div>
+1188:                               <Switch
+1189:                                 checked={timelineDraft.isPublic}
+1190:                                 onCheckedChange={(checked) =>
+1191:                                   setTimelineDrafts((prev) => ({
+1192:                                     ...prev,
+1193:                                     [incident.id]: {
+1194:                                       ...timelineDraft,
+1195:                                       isPublic: checked,
+1196:                                     },
+1197:                                   }))
+1198:                                 }
+1199:                                 disabled={postingUpdateId === incident.id}
+1200:                               />
+1201:                             </div>
+1202:                             <div className="space-y-2 lg:col-span-3">
+1203:                               <Label>Message</Label>
+1204:                               <Textarea
+1205:                                 rows={2}
+1206:                                 value={timelineDraft.message}
+1207:                                 onChange={(event) =>
+1208:                                   setTimelineDrafts((prev) => ({
+1209:                                     ...prev,
+1210:                                     [incident.id]: {
+1211:                                       ...timelineDraft,
+1212:                                       message: event.target.value,
+1213:                                     },
+1214:                                   }))
+1215:                                 }
+1216:                                 placeholder="Mitigation started. Error rate reduced."
+1217:                                 disabled={postingUpdateId === incident.id}
+1218:                               />
+1219:                             </div>
+1220:                           </div>
+1221:                           <div className="mt-3">
+1222:                             <Button
+1223:                               className="gap-2"
+1224:                               onClick={() => void handlePostTimelineUpdate(incident)}
+1225:                               disabled={postingUpdateId === incident.id}
+1226:                             >
+1227:                               {postingUpdateId === incident.id ? (
+1228:                                 <Loader2 className="h-4 w-4 animate-spin" />
+1229:                               ) : (
+1230:                                 <Send className="h-4 w-4" />
+1231:                               )}
+1232:                               Post Update
+1233:                             </Button>
+1234:                           </div>
+1235:                         </div>
+1236:                       ) : null}
+1237:                     </div>
+1238:                   );
+1239:                 })
+1240:               )}
+1241:             </CardContent>
+1242:           </Card>
+1243: 
+1244:           <Card>
+1245:             <CardHeader>
+1246:               <CardTitle>Resolved Incidents</CardTitle>
+1247:               <CardDescription>Recent incidents that were fully resolved.</CardDescription>
+1248:             </CardHeader>
+1249:             <CardContent className="space-y-3">
+1250:               {resolvedIncidents.length === 0 ? (
+1251:                 <p className="text-sm text-muted-foreground">No resolved incidents yet.</p>
+1252:               ) : (
+1253:                 resolvedIncidents.map((incident) => (
+1254:                   <div key={incident.id} className="rounded-md border border-border p-3">
+1255:                     <div className="flex flex-wrap items-start justify-between gap-2">
+1256:                       <div>
+1257:                         <p className="font-medium text-foreground">{incident.title}</p>
+1258:                         <p className="mt-1 text-xs text-muted-foreground">
+1259:                           Resolved {formatDateTime(incident.resolved_at)}
+1260:                         </p>
+1261:                       </div>
+1262:                       <div className="flex items-center gap-2">
+1263:                         <Badge className={statusBadgeClass(incident.status)}>
+1264:                           {toLabel(incident.status)}
+1265:                         </Badge>
+1266:                         <Badge className={severityBadgeClass(incident.severity)}>
+1267:                           {toLabel(incident.severity)}
+1268:                         </Badge>
+1269:                       </div>
+1270:                     </div>
+1271:                   </div>
+1272:                 ))
+1273:               )}
+1274:             </CardContent>
+1275:           </Card>
+1276:         </>
+1277:       ) : null}
+1278: 
+1279:       <AlertDialog
+1280:         open={Boolean(servicePendingDelete)}
+1281:         onOpenChange={(open) => {
+1282:           if (!open && !deletingServiceId) {
+1283:             setServicePendingDelete(null);
+1284:           }
+1285:         }}
+1286:       >
+1287:         <AlertDialogContent>
+1288:           <AlertDialogHeader>
+1289:             <AlertDialogTitle>Delete Service</AlertDialogTitle>
+1290:             <AlertDialogDescription>
+1291:               Delete &quot;{servicePendingDelete?.name ?? "this service"}&quot;? This will also remove its
+1292:               impact links from existing incidents.
+1293:             </AlertDialogDescription>
+1294:           </AlertDialogHeader>
+1295:           <AlertDialogFooter>
+1296:             <AlertDialogCancel disabled={Boolean(deletingServiceId)}>Cancel</AlertDialogCancel>
+1297:             <AlertDialogAction
+1298:               onClick={(event) => {
+1299:                 event.preventDefault();
+1300:                 void handleDeleteService();
+1301:               }}
+1302:               disabled={Boolean(deletingServiceId)}
+1303:               className="bg-red-600 hover:bg-red-700"
+1304:             >
+1305:               {deletingServiceId ? (
+1306:                 <span className="inline-flex items-center gap-2">
+1307:                   <Loader2 className="h-4 w-4 animate-spin" />
+1308:                   Deleting...
+1309:                 </span>
+1310:               ) : (
+1311:                 "Delete"
+1312:               )}
+1313:             </AlertDialogAction>
+1314:           </AlertDialogFooter>
+1315:         </AlertDialogContent>
+1316:       </AlertDialog>
+1317:     </div>
+1318:   );
+1319: }
+1320: 
