@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import {
+  getUniqueRecipientIds,
+  insertAppNotifications,
+} from "@/lib/server/notifications";
 import type {
   TicketCustomer,
   TicketListItem,
@@ -466,6 +470,25 @@ export async function POST(req: Request) {
       creator: usersById.get(insertedTicket.created_by) ?? null,
       customer,
     };
+
+    const assigneeRecipients = getUniqueRecipientIds(
+      [insertedTicket.assignee_id],
+      userId,
+    );
+    if (assigneeRecipients.length > 0) {
+      await insertAppNotifications(
+        supabase,
+        assigneeRecipients.map((recipientId) => ({
+          userId: recipientId,
+          organizationId: activeOrgId,
+          type: "ticket",
+          title: "New ticket assigned",
+          body: `Ticket "${insertedTicket.title}" has been assigned to you.`,
+          entityType: "ticket",
+          entityId: insertedTicket.id,
+        })),
+      );
+    }
 
     return NextResponse.json({ ticket }, { status: 201 });
   } catch {

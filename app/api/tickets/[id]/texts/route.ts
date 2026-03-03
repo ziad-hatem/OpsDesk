@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import {
+  getUniqueRecipientIds,
+  insertAppNotifications,
+} from "@/lib/server/notifications";
 import type { TicketTextType, TicketTextWithAttachments, TicketUser } from "@/lib/tickets/types";
 import { isTicketTextType } from "@/lib/tickets/validation";
 import {
@@ -17,6 +21,12 @@ type CreateTicketTextBody = {
 };
 
 type TicketTextRow = Omit<TicketTextWithAttachments, "author" | "attachments">;
+type TicketRecipientsRow = {
+  id: string;
+  title: string;
+  assignee_id: string | null;
+  created_by: string;
+};
 
 function normalizeText(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -73,11 +83,12 @@ export async function POST(req: Request, context: RouteContext) {
     );
   }
 
-  const { count: ticketCount, error: ticketAccessError } = await supabase
+  const { data: ticketRow, error: ticketAccessError } = await supabase
     .from("tickets")
-    .select("id", { count: "exact", head: true })
+    .select("id, title, assignee_id, created_by")
     .eq("id", ticketId)
-    .eq("organization_id", activeOrgId);
+    .eq("organization_id", activeOrgId)
+    .maybeSingle<TicketRecipientsRow>();
 
   if (ticketAccessError) {
     if (isMissingTableInSchemaCache(ticketAccessError, "tickets")) {
@@ -91,7 +102,7 @@ export async function POST(req: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-  if (!ticketCount) {
+  if (!ticketRow) {
     return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
   }
 
@@ -133,6 +144,29 @@ export async function POST(req: Request, context: RouteContext) {
     author: author ?? null,
     attachments: [],
   };
+
+  const recipients = getUniqueRecipientIds(
+    [ticketRow.created_by, ticketRow.assignee_id],
+    userId,
+  );
+  if (recipients.length > 0) {
+    const preview = content.length > 120 ? `${content.slice(0, 117)}...` : content;
+    const title = type === "internal_note"
+      ? "New internal note on ticket"
+      : "New comment on ticket";
+    await insertAppNotifications(
+      supabase,
+      recipients.map((recipientId) => ({
+        userId: recipientId,
+        organizationId: activeOrgId,
+        type: "comment",
+        title,
+        body: `${ticketRow.title}: ${preview}`,
+        entityType: "ticket",
+        entityId: ticketId,
+      })),
+    );
+  }
 
   return NextResponse.json({ text }, { status: 201 });
 }

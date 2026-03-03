@@ -98,6 +98,8 @@ export function Topbar() {
   const userName = topbarData?.user.name ?? null;
   const userEmail = topbarData?.user.email ?? "";
   const userAvatarUrl = topbarData?.user.avatar_url ?? null;
+  const canCreateOrganizations =
+    topbarData?.organizationCreation.canCreateFromScratch ?? true;
   const userInitials =
     userEmail || userName ? getInitials(userName, userEmail || "user@local") : "OD";
   const isTopbarLoading = topbarStatus === "loading" && !topbarData;
@@ -167,7 +169,10 @@ export function Topbar() {
   };
 
   const handleCreateOrganizationClick = async () => {
-    if (isCreatingOrganization) {
+    if (isCreatingOrganization || !canCreateOrganizations) {
+      if (!canCreateOrganizations) {
+        toast.error("This invited account cannot create organizations.");
+      }
       return;
     }
 
@@ -253,7 +258,7 @@ export function Topbar() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleCreateOrganizationClick}
-                disabled={isCreatingOrganization || isTopbarLoading}
+                disabled={isCreatingOrganization || isTopbarLoading || !canCreateOrganizations}
               >
                 {isCreatingOrganization ? (
                   <div className="flex items-center gap-2">
@@ -264,6 +269,11 @@ export function Topbar() {
                   "Create organization"
                 )}
               </DropdownMenuItem>
+              {!canCreateOrganizations && (
+                <DropdownMenuItem disabled>
+                  Organization creation is disabled for invited accounts.
+                </DropdownMenuItem>
+              )}
               {topbarData?.organizationCreation.canCreateFromSignupOrganization &&
                 topbarData.organizationCreation.signupOrganizationName && (
                   <DropdownMenuItem disabled>

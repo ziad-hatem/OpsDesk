@@ -18,11 +18,18 @@ export interface MeResponse {
   user: TopbarUser;
   organizations: TopbarOrganization[];
   activeOrgId: string | null;
+  access: {
+    totalMemberships: number;
+    activeMemberships: number;
+    suspendedMemberships: number;
+    hasOnlySuspendedMemberships: boolean;
+  };
   notifications: {
     unreadCount: number;
   };
   organizationCreation: {
     signupOrganizationName: string | null;
     canCreateFromSignupOrganization: boolean;
+    canCreateFromScratch: boolean;
   };
 }

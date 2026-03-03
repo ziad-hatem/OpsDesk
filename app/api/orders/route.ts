@@ -7,7 +7,13 @@ import type {
   OrdersListResponse,
   OrderUser,
 } from "@/lib/orders/types";
-import { isOrderStatus, normalizeCurrencyCode, normalizeOrderStatus } from "@/lib/orders/validation";
+import {
+  derivePaymentStatusFromOrderStatus,
+  isOrderPaymentStatus,
+  isOrderStatus,
+  normalizeCurrencyCode,
+  normalizeOrderStatus,
+} from "@/lib/orders/validation";
 import { isMissingTableInSchemaCache, missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type OrderRow = Omit<OrderListItem, "customer" | "creator">;
@@ -115,6 +121,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get("status");
+    const paymentStatusFilter = searchParams.get("paymentStatus");
     const customerIdFilter = searchParams.get("customerId");
     const search = searchParams.get("search")?.trim() ?? "";
     const limitParam = Number(searchParams.get("limit") ?? "200");
@@ -125,7 +132,7 @@ export async function GET(req: Request) {
     let query = supabase
       .from("orders")
       .select(
-        "id, organization_id, customer_id, order_number, status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, notes, created_by, created_at, updated_at",
+        "id, organization_id, customer_id, order_number, status, payment_status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, stripe_checkout_session_id, stripe_payment_intent_id, payment_link_url, payment_link_sent_at, payment_completed_at, notes, created_by, created_at, updated_at",
       )
       .eq("organization_id", activeOrgId)
       .order("created_at", { ascending: false })
@@ -133,6 +140,14 @@ export async function GET(req: Request) {
 
     if (statusFilter && statusFilter !== "all" && isOrderStatus(statusFilter)) {
       query = query.eq("status", statusFilter);
+    }
+
+    if (
+      paymentStatusFilter &&
+      paymentStatusFilter !== "all" &&
+      isOrderPaymentStatus(paymentStatusFilter)
+    ) {
+      query = query.eq("payment_status", paymentStatusFilter);
     }
 
     if (customerIdFilter && customerIdFilter !== "all") {
@@ -253,6 +268,7 @@ export async function POST(req: Request) {
     }
 
     const status = normalizeOrderStatus(body.status, "draft");
+    const paymentStatus = derivePaymentStatusFromOrderStatus(status);
     const currency = normalizeCurrencyCode(body.currency, "");
     if (!currency) {
       return NextResponse.json(
@@ -347,6 +363,7 @@ export async function POST(req: Request) {
         customer_id: customerId,
         order_number: orderNumber,
         status,
+        payment_status: paymentStatus,
         currency,
         subtotal_amount: subtotalAmount,
         tax_amount: taxAmount,
@@ -360,7 +377,7 @@ export async function POST(req: Request) {
         created_by: userId,
       })
       .select(
-        "id, organization_id, customer_id, order_number, status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, notes, created_by, created_at, updated_at",
+        "id, organization_id, customer_id, order_number, status, payment_status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, stripe_checkout_session_id, stripe_payment_intent_id, payment_link_url, payment_link_sent_at, payment_completed_at, notes, created_by, created_at, updated_at",
       )
       .single<OrderRow>();
 

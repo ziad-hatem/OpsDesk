@@ -5,6 +5,7 @@ import { ACTIVE_ORG_COOKIE } from "@/lib/topbar/constants";
 
 type MembershipRow = {
   organization_id: string;
+  status?: "active" | "suspended" | null;
 };
 
 export interface TicketRequestContext {
@@ -69,21 +70,52 @@ export async function getTicketRequestContext(): Promise<
     };
   }
 
-  const { data: membershipsData, error: membershipsError } = await supabase
+  let membershipsData: MembershipRow[] = [];
+  const membershipResultWithStatus = await supabase
     .from("organization_memberships")
-    .select("organization_id")
+    .select("organization_id, status")
     .eq("user_id", session.user.id)
     .returns<MembershipRow[]>();
 
-  if (membershipsError) {
-    return {
-      ok: false,
-      status: 500,
-      error: `Failed to load organization memberships: ${membershipsError.message}`,
-    };
+  if (membershipResultWithStatus.error) {
+    const isMissingStatusColumn =
+      membershipResultWithStatus.error.message
+        .toLowerCase()
+        .includes("organization_memberships.status");
+
+    if (!isMissingStatusColumn) {
+      return {
+        ok: false,
+        status: 500,
+        error: `Failed to load organization memberships: ${membershipResultWithStatus.error.message}`,
+      };
+    }
+
+    const membershipFallbackResult = await supabase
+      .from("organization_memberships")
+      .select("organization_id")
+      .eq("user_id", session.user.id)
+      .returns<Array<{ organization_id: string }>>();
+
+    if (membershipFallbackResult.error) {
+      return {
+        ok: false,
+        status: 500,
+        error: `Failed to load organization memberships: ${membershipFallbackResult.error.message}`,
+      };
+    }
+
+    membershipsData = (membershipFallbackResult.data ?? []).map((membership) => ({
+      organization_id: membership.organization_id,
+      status: "active",
+    }));
+  } else {
+    membershipsData = membershipResultWithStatus.data ?? [];
   }
 
-  const orgIds = (membershipsData ?? []).map((membership) => membership.organization_id);
+  const orgIds = membershipsData
+    .filter((membership) => membership.status !== "suspended")
+    .map((membership) => membership.organization_id);
   const cookieStore = await cookies();
   const activeOrgFromCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value ?? null;
   const activeOrgId =

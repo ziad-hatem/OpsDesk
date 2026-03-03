@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { ACTIVE_ORG_COOKIE } from "@/lib/topbar/constants";
+import { isInviteCreatedAccount } from "@/lib/server/membership-access";
 
 type CreateOrganizationRequest = {
   type?: "from_scratch" | "from_signup_company";
@@ -80,6 +81,16 @@ export async function POST(req: Request) {
     }
 
     const authUser = authUserResult.user;
+    if (isInviteCreatedAccount(authUser.user_metadata)) {
+      return NextResponse.json(
+        {
+          error:
+            "Accounts created from an invitation cannot create organizations.",
+        },
+        { status: 403 },
+      );
+    }
+
     const authEmail = authUser.email;
     if (!authEmail) {
       return NextResponse.json(

@@ -7,6 +7,8 @@ import { store } from "@/lib/store/store";
 import { clearLoggedUser, setLoggedUser } from "@/lib/store/slices/auth-slice";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { fetchTopbarData } from "@/lib/store/slices/topbar-slice";
+import { NotificationRealtimeBridge } from "@/app/components/NotificationRealtimeBridge";
+import { MembershipRealtimeGuard } from "@/app/components/MembershipRealtimeGuard";
 
 function AuthSessionSync() {
   const dispatch = useAppDispatch();
@@ -41,6 +43,8 @@ export function AppProviders({ children }: AppProvidersProps) {
     <Provider store={store}>
       <SessionProvider>
         <AuthSessionSync />
+        <NotificationRealtimeBridge />
+        <MembershipRealtimeGuard />
         {children}
       </SessionProvider>
     </Provider>

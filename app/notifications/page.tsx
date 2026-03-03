@@ -99,6 +99,21 @@ export default function NotificationsCenterPage() {
     void loadNotifications();
   }, [activeOrgId, loadNotifications]);
 
+  useEffect(() => {
+    const handleNotificationsUpdated = () => {
+      void loadNotifications();
+      void dispatch(fetchTopbarData());
+    };
+
+    window.addEventListener("notifications:updated", handleNotificationsUpdated);
+    return () => {
+      window.removeEventListener(
+        "notifications:updated",
+        handleNotificationsUpdated,
+      );
+    };
+  }, [dispatch, loadNotifications]);
+
   const unreadCount = useMemo(
     () => notifications.filter((notification) => !notification.read_at).length,
     [notifications],

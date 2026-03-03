@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "@/lib/server/audit-logs";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import {
+  getUniqueRecipientIds,
+  insertAppNotifications,
+} from "@/lib/server/notifications";
 import type {
   TicketCustomer,
   TicketDetailResponse,
@@ -420,6 +425,10 @@ export async function PATCH(req: Request, context: RouteContext) {
 
   const updatePayload: Partial<TicketRow> = {};
   const systemMessages: string[] = [];
+  let statusChange: { from: string; to: string } | null = null;
+  let priorityChange: { from: string; to: string } | null = null;
+  let assigneeChange: { from: string | null; to: string | null } | null = null;
+  let effectiveAssigneeId = existingTicket.assignee_id;
 
   const hasTitle = Object.prototype.hasOwnProperty.call(body, "title");
   if (hasTitle) {
@@ -452,6 +461,10 @@ export async function PATCH(req: Request, context: RouteContext) {
     }
     if (body.status !== existingTicket.status) {
       updatePayload.status = body.status;
+      statusChange = {
+        from: existingTicket.status,
+        to: body.status,
+      };
       systemMessages.push(
         `Status changed from ${toLabel(existingTicket.status)} to ${toLabel(body.status)}`,
       );
@@ -470,6 +483,10 @@ export async function PATCH(req: Request, context: RouteContext) {
     }
     if (body.priority !== existingTicket.priority) {
       updatePayload.priority = body.priority;
+      priorityChange = {
+        from: existingTicket.priority,
+        to: body.priority,
+      };
       systemMessages.push(
         `Priority changed from ${toLabel(existingTicket.priority)} to ${toLabel(body.priority)}`,
       );
@@ -502,6 +519,11 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (assigneeId !== existingTicket.assignee_id) {
       updatePayload.assignee_id = assigneeId;
+      assigneeChange = {
+        from: existingTicket.assignee_id,
+        to: assigneeId,
+      };
+      effectiveAssigneeId = assigneeId;
       systemMessages.push("Assignee updated");
     }
   }
@@ -607,6 +629,8 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   if (Object.keys(updatePayload).length > 0) {
+    const ticketTitleForNotifications = updatePayload.title ?? existingTicket.title;
+
     const { error: updateError } = await supabase
       .from("tickets")
       .update(updatePayload)
@@ -650,6 +674,138 @@ export async function PATCH(req: Request, context: RouteContext) {
           { status: 500 },
         );
       }
+    }
+
+    if (assigneeChange?.to) {
+      const recipients = getUniqueRecipientIds([assigneeChange.to], userId);
+      if (recipients.length > 0) {
+        await insertAppNotifications(
+          supabase,
+          recipients.map((recipientId) => ({
+            userId: recipientId,
+            organizationId: activeOrgId,
+            type: "ticket",
+            title: "Ticket assigned to you",
+            body: `Ticket "${ticketTitleForNotifications}" has been assigned to you.`,
+            entityType: "ticket",
+            entityId: ticketId,
+          })),
+        );
+      }
+    }
+
+    if (assigneeChange?.from && assigneeChange.from !== assigneeChange.to) {
+      const recipients = getUniqueRecipientIds([assigneeChange.from], userId);
+      if (recipients.length > 0) {
+        const title = assigneeChange.to ? "Ticket reassigned" : "Ticket unassigned";
+        await insertAppNotifications(
+          supabase,
+          recipients.map((recipientId) => ({
+            userId: recipientId,
+            organizationId: activeOrgId,
+            type: "ticket",
+            title,
+            body: `Ticket "${ticketTitleForNotifications}" is no longer assigned to you.`,
+            entityType: "ticket",
+            entityId: ticketId,
+          })),
+        );
+      }
+    }
+
+    if (statusChange) {
+      const recipients = getUniqueRecipientIds(
+        [existingTicket.created_by, effectiveAssigneeId],
+        userId,
+      );
+      if (recipients.length > 0) {
+        await insertAppNotifications(
+          supabase,
+          recipients.map((recipientId) => ({
+            userId: recipientId,
+            organizationId: activeOrgId,
+            type: "ticket",
+            title: "Ticket status updated",
+            body: `Ticket "${ticketTitleForNotifications}" moved from ${toLabel(statusChange.from)} to ${toLabel(statusChange.to)}.`,
+            entityType: "ticket",
+            entityId: ticketId,
+          })),
+        );
+      }
+    }
+
+    if (priorityChange) {
+      const recipients = getUniqueRecipientIds(
+        [existingTicket.created_by, effectiveAssigneeId],
+        userId,
+      );
+      if (recipients.length > 0) {
+        await insertAppNotifications(
+          supabase,
+          recipients.map((recipientId) => ({
+            userId: recipientId,
+            organizationId: activeOrgId,
+            type: "ticket",
+            title: "Ticket priority updated",
+            body: `Ticket "${ticketTitleForNotifications}" priority changed from ${toLabel(priorityChange.from)} to ${toLabel(priorityChange.to)}.`,
+            entityType: "ticket",
+            entityId: ticketId,
+          })),
+        );
+      }
+    }
+
+    if (assigneeChange) {
+      const assigneeAction =
+        assigneeChange.from && assigneeChange.to
+          ? "ticket.assignee.reassigned"
+          : assigneeChange.to
+            ? "ticket.assignee.assigned"
+            : "ticket.assignee.unassigned";
+
+      await writeAuditLog({
+        supabase,
+        organizationId: activeOrgId,
+        actorUserId: userId,
+        action: assigneeAction,
+        entityType: "ticket",
+        entityId: ticketId,
+        targetUserId: assigneeChange.to ?? assigneeChange.from,
+        details: {
+          fromAssigneeId: assigneeChange.from,
+          toAssigneeId: assigneeChange.to,
+        },
+      });
+    }
+
+    if (statusChange) {
+      await writeAuditLog({
+        supabase,
+        organizationId: activeOrgId,
+        actorUserId: userId,
+        action: "ticket.status.changed",
+        entityType: "ticket",
+        entityId: ticketId,
+        details: {
+          fromStatus: statusChange.from,
+          toStatus: statusChange.to,
+        },
+      });
+    }
+
+    if (priorityChange) {
+      await writeAuditLog({
+        supabase,
+        organizationId: activeOrgId,
+        actorUserId: userId,
+        action: "ticket.priority.changed",
+        entityType: "ticket",
+        entityId: ticketId,
+        details: {
+          fromPriority: priorityChange.from,
+          toPriority: priorityChange.to,
+        },
+      });
     }
   }
 

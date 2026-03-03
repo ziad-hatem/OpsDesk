@@ -4,6 +4,11 @@ import { auth } from "@/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { ACTIVE_ORG_COOKIE } from "@/lib/topbar/constants";
 import type { MeResponse, TopbarOrganization } from "@/lib/topbar/types";
+import {
+  emptyMembershipAccessSummary,
+  isInviteCreatedAccount,
+  loadMembershipAccessSummary,
+} from "@/lib/server/membership-access";
 
 type OrganizationRow = {
   id: string;
@@ -14,6 +19,7 @@ type OrganizationRow = {
 type MembershipRow = {
   organization_id: string;
   role: TopbarOrganization["role"];
+  status?: "active" | "suspended" | null;
   organizations: OrganizationRow | OrganizationRow[] | null;
 };
 
@@ -45,6 +51,7 @@ function normalizeSignupOrganizationName(value: unknown): string | null {
 function buildFallbackPayload(
   session: AuthSession,
   signupOrganizationName: string | null,
+  canCreateFromScratch = true,
 ): MeResponse {
   return {
     user: {
@@ -55,12 +62,14 @@ function buildFallbackPayload(
     },
     organizations: [],
     activeOrgId: null,
+    access: emptyMembershipAccessSummary(),
     notifications: {
       unreadCount: 0,
     },
     organizationCreation: {
       signupOrganizationName,
       canCreateFromSignupOrganization: Boolean(signupOrganizationName),
+      canCreateFromScratch,
     },
   };
 }
@@ -94,6 +103,9 @@ export async function GET() {
     const { data: authUserResult } = await supabase.auth.admin.getUserById(
       session.user.id,
     );
+    const inviteCreatedAccount = isInviteCreatedAccount(
+      authUserResult.user?.user_metadata,
+    );
     const signupOrganizationName = normalizeSignupOrganizationName(
       authUserResult.user?.user_metadata?.company,
     );
@@ -106,7 +118,11 @@ export async function GET() {
 
     if (userError) {
       return NextResponse.json(
-        buildFallbackPayload(session, signupOrganizationName),
+        buildFallbackPayload(
+          session,
+          signupOrganizationName,
+          !inviteCreatedAccount,
+        ),
         { status: 200 },
       );
     }
@@ -125,7 +141,11 @@ export async function GET() {
 
       if (insertError) {
         return NextResponse.json(
-          buildFallbackPayload(session, signupOrganizationName),
+          buildFallbackPayload(
+            session,
+            signupOrganizationName,
+            !inviteCreatedAccount,
+          ),
           { status: 200 },
         );
       }
@@ -138,15 +158,45 @@ export async function GET() {
       avatar_url: session.user.image ?? null,
     };
 
-    const { data: membershipsData, error: membershipsError } = await supabase
+    const membershipAccessResult = await loadMembershipAccessSummary(
+      supabase,
+      currentUser.id,
+    );
+
+    let membershipsData: MembershipRow[] = [];
+    let membershipsError: { message: string } | null = null;
+
+    const membershipsResultWithStatus = await supabase
       .from("organization_memberships")
-      .select("organization_id, role, organizations(id, name, logo_url)")
+      .select("organization_id, role, status, organizations(id, name, logo_url)")
       .eq("user_id", currentUser.id)
       .returns<MembershipRow[]>();
 
+    if (membershipsResultWithStatus.error) {
+      const isMissingStatusColumn = membershipsResultWithStatus.error.message
+        .toLowerCase()
+        .includes("organization_memberships.status");
+
+      if (isMissingStatusColumn) {
+        const membershipsFallbackResult = await supabase
+          .from("organization_memberships")
+          .select("organization_id, role, organizations(id, name, logo_url)")
+          .eq("user_id", currentUser.id)
+          .returns<MembershipRow[]>();
+
+        membershipsData = membershipsFallbackResult.data ?? [];
+        membershipsError = membershipsFallbackResult.error;
+      } else {
+        membershipsError = membershipsResultWithStatus.error;
+      }
+    } else {
+      membershipsData = membershipsResultWithStatus.data ?? [];
+    }
+
     const organizations = membershipsError
       ? []
-      : (membershipsData ?? [])
+      : membershipsData
+          .filter((membership) => membership.status !== "suspended")
           .map(normalizeOrganization)
           .filter((item): item is TopbarOrganization => item !== null);
 
@@ -180,13 +230,19 @@ export async function GET() {
       user: currentUser,
       organizations,
       activeOrgId,
+      access: membershipAccessResult.error
+        ? emptyMembershipAccessSummary()
+        : membershipAccessResult.summary,
       notifications: {
         unreadCount,
       },
       organizationCreation: {
         signupOrganizationName,
         canCreateFromSignupOrganization:
-          Boolean(signupOrganizationName) && organizations.length === 0,
+          Boolean(signupOrganizationName) &&
+          organizations.length === 0 &&
+          !inviteCreatedAccount,
+        canCreateFromScratch: !inviteCreatedAccount,
       },
     };
 

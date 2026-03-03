@@ -152,9 +152,9 @@ export default function CustomerDetailPage() {
               <div className="p-2 bg-slate-100 rounded-lg">
                 <Mail className="w-5 h-5 text-slate-700" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-slate-600">Email</p>
-                <p className="font-medium text-slate-900">{customer.email ?? "-"}</p>
+                <p className="font-medium text-slate-900 break-all">{customer.email ?? "-"}</p>
               </div>
             </div>
           </CardContent>
@@ -222,7 +222,7 @@ export default function CustomerDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-600 mb-1">Email</p>
-                <p className="font-medium text-slate-900">{customer.email ?? "-"}</p>
+                <p className="font-medium text-slate-900 break-all">{customer.email ?? "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-slate-600 mb-1">Open Tickets</p>

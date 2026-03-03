@@ -74,3 +74,20 @@ create index if not exists notifications_user_read_idx
 
 create index if not exists notifications_user_org_idx
   on public.notifications (user_id, organization_id);
+
+-- Realtime websocket support for notifications.
+alter table if exists public.notifications
+  replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'notifications'
+  ) then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end $$;

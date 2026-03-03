@@ -216,6 +216,7 @@ export const selectTopbarOrganizationCreation = (state: RootState) =>
   state.topbar.data?.organizationCreation ?? {
     signupOrganizationName: null,
     canCreateFromSignupOrganization: false,
+    canCreateFromScratch: true,
   };
 export const selectTopbarUser = (state: RootState) =>
   state.topbar.data?.user ?? null;

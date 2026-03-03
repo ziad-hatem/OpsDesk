@@ -6,6 +6,15 @@ export type OrderStatus =
   | "cancelled"
   | "refunded";
 
+export type OrderPaymentStatus =
+  | "unpaid"
+  | "payment_link_sent"
+  | "paid"
+  | "failed"
+  | "refunded"
+  | "expired"
+  | "cancelled";
+
 export interface OrderUser {
   id: string;
   name: string | null;
@@ -25,6 +34,7 @@ export interface OrderListItem {
   customer_id: string;
   order_number: string;
   status: OrderStatus;
+  payment_status: OrderPaymentStatus;
   currency: string;
   subtotal_amount: number;
   tax_amount: number;
@@ -34,6 +44,11 @@ export interface OrderListItem {
   paid_at: string | null;
   fulfilled_at: string | null;
   cancelled_at: string | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  payment_link_url: string | null;
+  payment_link_sent_at: string | null;
+  payment_completed_at: string | null;
   notes: string | null;
   created_by: string;
   created_at: string;

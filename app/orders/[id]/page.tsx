@@ -5,7 +5,9 @@ import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  CreditCard,
   Download,
+  ExternalLink,
   Loader2,
   Paperclip,
   Plus,
@@ -135,6 +137,7 @@ export default function OrderDetailPage() {
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [isAddingLineItem, setIsAddingLineItem] = useState(false);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [isSendingPaymentLink, setIsSendingPaymentLink] = useState(false);
   const [activeDownloadAttachmentId, setActiveDownloadAttachmentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
@@ -182,6 +185,11 @@ export default function OrderDetailPage() {
   const items = useMemo(() => detail?.items ?? [], [detail?.items]);
   const attachments = useMemo(() => detail?.attachments ?? [], [detail?.attachments]);
   const statusEvents = useMemo(() => detail?.statusEvents ?? [], [detail?.statusEvents]);
+  const canSendPaymentLink =
+    !!order?.customer?.email &&
+    order?.status !== "cancelled" &&
+    order?.status !== "refunded" &&
+    order?.payment_status !== "paid";
 
   const handleUpdateStatus = async (status: OrderStatus) => {
     if (!id || !order || status === order.status) {
@@ -451,6 +459,35 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleSendPaymentLink = async () => {
+    if (!id || !order) {
+      return;
+    }
+
+    setIsSendingPaymentLink(true);
+    const toastId = toast.loading("Sending payment link...");
+    try {
+      const response = await fetch(`/api/orders/${id}/payment-link`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const errorData = (await response.json()) as { error?: string };
+        throw new Error(errorData.error ?? "Failed to send payment link");
+      }
+
+      await response.json();
+      await loadOrder();
+      toast.success("Payment link sent to customer email", { id: toastId });
+    } catch (sendError: unknown) {
+      const message =
+        sendError instanceof Error ? sendError.message : "Failed to send payment link";
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsSendingPaymentLink(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -495,6 +532,7 @@ export default function OrderDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-semibold text-slate-900">{order.order_number}</h1>
             <StatusBadge status={order.status} />
+            <StatusBadge status={order.payment_status} />
           </div>
           <p className="text-slate-600 mt-1">
             Created {formatDateTime(order.created_at)}
@@ -512,12 +550,15 @@ export default function OrderDetailPage() {
               <div>
                 <Label className="text-sm text-slate-600 mb-1 block">Customer</Label>
                 {order.customer ? (
-                  <button
-                    onClick={() => router.push(`/customers/${order.customer?.id}`)}
-                    className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
-                  >
-                    {order.customer.name}
-                  </button>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => router.push(`/customers/${order.customer?.id}`)}
+                      className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+                    >
+                      {order.customer.name}
+                    </button>
+                    <p className="text-sm text-slate-600">{order.customer.email ?? "No email"}</p>
+                  </div>
                 ) : (
                   <p className="font-medium text-slate-400">Unknown customer</p>
                 )}
@@ -802,6 +843,45 @@ export default function OrderDetailPage() {
                 </Select>
               </div>
 
+              <div className="space-y-3">
+                <Label className="text-sm text-slate-600 block">Payment Status</Label>
+                <StatusBadge status={order.payment_status} />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSendPaymentLink}
+                  disabled={!canSendPaymentLink || isSendingPaymentLink}
+                >
+                  {isSendingPaymentLink ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Send Payment Link
+                    </>
+                  )}
+                </Button>
+                {!order.customer?.email && (
+                  <p className="text-xs text-amber-700">
+                    Customer email is required to send payment link.
+                  </p>
+                )}
+                {order.payment_link_url && (
+                  <a
+                    href={order.payment_link_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-slate-700 hover:underline"
+                  >
+                    Open latest payment link
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-sm text-slate-600">Notes</Label>
                 <Textarea
@@ -836,6 +916,14 @@ export default function OrderDetailPage() {
               <div>
                 <Label className="text-sm text-slate-600 mb-1 block">Paid At</Label>
                 <p className="font-medium text-slate-900">{formatDateTime(order.paid_at)}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-slate-600 mb-1 block">Payment Link Sent</Label>
+                <p className="font-medium text-slate-900">{formatDateTime(order.payment_link_sent_at)}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-slate-600 mb-1 block">Payment Completed</Label>
+                <p className="font-medium text-slate-900">{formatDateTime(order.payment_completed_at)}</p>
               </div>
               <div>
                 <Label className="text-sm text-slate-600 mb-1 block">Fulfilled At</Label>

@@ -15,6 +15,8 @@ const PUBLIC_AUTH_ROUTES = new Set([
   "/verify",
   "/forgot-password",
   "/reset-password",
+  "/auth/magic-link",
+  "/payment/thank-you",
 ]);
 
 function LayoutShell({
@@ -29,13 +31,15 @@ function LayoutShell({
   const isPublicAuthRoute = pathname
     ? PUBLIC_AUTH_ROUTES.has(pathname)
     : false;
+  const isInviteRoute = pathname ? pathname.startsWith("/invite/") : false;
+  const isPublicRoute = isPublicAuthRoute || isInviteRoute;
 
   useEffect(() => {
     if (status === "loading") {
       return;
     }
 
-    if (!isPublicAuthRoute && status === "unauthenticated") {
+    if (!isPublicRoute && status === "unauthenticated") {
       router.replace("/login");
       return;
     }
@@ -43,13 +47,13 @@ function LayoutShell({
     if (isPublicAuthRoute && status === "authenticated") {
       router.replace("/");
     }
-  }, [isPublicAuthRoute, router, status]);
+  }, [isPublicAuthRoute, isPublicRoute, router, status]);
 
-  if (!isPublicAuthRoute && status !== "authenticated") {
+  if (!isPublicRoute && status !== "authenticated") {
     return null;
   }
 
-  if (isPublicAuthRoute) {
+  if (isPublicRoute) {
     return (
       <main className="flex-1 overflow-auto">
         {children}

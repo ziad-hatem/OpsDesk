@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "@/lib/server/audit-logs";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
@@ -11,7 +12,7 @@ import type {
   OrderStatusEvent,
   OrderUser,
 } from "@/lib/orders/types";
-import { isOrderStatus } from "@/lib/orders/validation";
+import { derivePaymentStatusFromOrderStatus, isOrderStatus } from "@/lib/orders/validation";
 import { isMissingTableInSchemaCache, missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type OrderRow = Omit<OrderListItem, "customer" | "creator">;
@@ -77,7 +78,7 @@ async function buildOrderDetailResponse(params: {
   const { data: orderRow, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, organization_id, customer_id, order_number, status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, notes, created_by, created_at, updated_at",
+      "id, organization_id, customer_id, order_number, status, payment_status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, stripe_checkout_session_id, stripe_payment_intent_id, payment_link_url, payment_link_sent_at, payment_completed_at, notes, created_by, created_at, updated_at",
     )
     .eq("organization_id", activeOrgId)
     .eq("id", orderId)
@@ -328,7 +329,7 @@ export async function PATCH(req: Request, context: RouteContext) {
   const { data: existingOrder, error: existingOrderError } = await supabase
     .from("orders")
     .select(
-      "id, organization_id, customer_id, order_number, status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, notes, created_by, created_at, updated_at",
+      "id, organization_id, customer_id, order_number, status, payment_status, currency, subtotal_amount, tax_amount, discount_amount, total_amount, placed_at, paid_at, fulfilled_at, cancelled_at, stripe_checkout_session_id, stripe_payment_intent_id, payment_link_url, payment_link_sent_at, payment_completed_at, notes, created_by, created_at, updated_at",
     )
     .eq("organization_id", activeOrgId)
     .eq("id", orderId)
@@ -363,6 +364,7 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (body.status !== existingOrder.status) {
       updatePayload.status = body.status;
+      updatePayload.payment_status = derivePaymentStatusFromOrderStatus(body.status);
       fromStatus = existingOrder.status;
       toStatus = body.status;
 
@@ -514,6 +516,20 @@ export async function PATCH(req: Request, context: RouteContext) {
         { status: 500 },
       );
     }
+
+    await writeAuditLog({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      action: "order.status.changed",
+      entityType: "order",
+      entityId: orderId,
+      details: {
+        fromStatus,
+        toStatus,
+        reason: statusReason,
+      },
+    });
   }
 
   const detailResult = await buildOrderDetailResponse({

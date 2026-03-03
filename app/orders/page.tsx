@@ -33,12 +33,14 @@ import type { CustomerListItem, CustomersListResponse } from "@/lib/customers/ty
 import type {
   OrderDetailResponse,
   OrderListItem,
+  OrderPaymentStatus,
   OrdersListResponse,
   OrderStatus,
 } from "@/lib/orders/types";
 
 type FilterState = {
   status: "all" | OrderStatus;
+  paymentStatus: "all" | OrderPaymentStatus;
   customerId: "all" | string;
 };
 
@@ -87,6 +89,16 @@ const ORDER_STATUS_OPTIONS: Array<{ value: OrderStatus; label: string }> = [
   { value: "fulfilled", label: "Fulfilled" },
   { value: "cancelled", label: "Cancelled" },
   { value: "refunded", label: "Refunded" },
+];
+
+const PAYMENT_STATUS_OPTIONS: Array<{ value: OrderPaymentStatus; label: string }> = [
+  { value: "unpaid", label: "Unpaid" },
+  { value: "payment_link_sent", label: "Link Sent" },
+  { value: "paid", label: "Paid" },
+  { value: "failed", label: "Failed" },
+  { value: "expired", label: "Expired" },
+  { value: "refunded", label: "Refunded" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 function formatDateTime(isoDate: string | null) {
@@ -145,6 +157,9 @@ function canIncludeInCurrentFilter(order: OrderListItem, filters: FilterState) {
   if (filters.status !== "all" && order.status !== filters.status) {
     return false;
   }
+  if (filters.paymentStatus !== "all" && order.payment_status !== filters.paymentStatus) {
+    return false;
+  }
   if (filters.customerId !== "all" && order.customer_id !== filters.customerId) {
     return false;
   }
@@ -167,6 +182,7 @@ export default function OrdersListPage() {
   ]);
   const [filters, setFilters] = useState<FilterState>({
     status: "all",
+    paymentStatus: "all",
     customerId: "all",
   });
 
@@ -176,6 +192,9 @@ export default function OrdersListPage() {
       const params = new URLSearchParams();
       if (filters.status !== "all") {
         params.set("status", filters.status);
+      }
+      if (filters.paymentStatus !== "all") {
+        params.set("paymentStatus", filters.paymentStatus);
       }
       if (filters.customerId !== "all") {
         params.set("customerId", filters.customerId);
@@ -201,7 +220,7 @@ export default function OrdersListPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [filters.customerId, filters.status]);
+  }, [filters.customerId, filters.paymentStatus, filters.status]);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -234,7 +253,7 @@ export default function OrdersListPage() {
   }, [activeOrgId, loadCustomers, loadOrders]);
 
   const paidOrdersCount = useMemo(
-    () => orders.filter((order) => order.status === "paid" || order.status === "fulfilled").length,
+    () => orders.filter((order) => order.payment_status === "paid").length,
     [orders],
   );
 
@@ -344,6 +363,11 @@ export default function OrdersListPage() {
             </SelectContent>
           </Select>
         ),
+      },
+      {
+        accessorKey: "payment_status",
+        header: "Payment",
+        cell: ({ row }) => <StatusBadge status={row.original.payment_status} />,
       },
       {
         accessorKey: "total_amount",
@@ -494,6 +518,7 @@ export default function OrdersListPage() {
       "order_number",
       "customer_name",
       "status",
+      "payment_status",
       "currency",
       "subtotal_amount",
       "tax_amount",
@@ -507,6 +532,7 @@ export default function OrdersListPage() {
         order.order_number,
         order.customer?.name ?? "",
         order.status,
+        order.payment_status,
         order.currency,
         String(order.subtotal_amount),
         String(order.tax_amount),
@@ -581,6 +607,28 @@ export default function OrdersListPage() {
           </Select>
 
           <Select
+            value={filters.paymentStatus}
+            onValueChange={(value) =>
+              setFilters((prev) => ({
+                ...prev,
+                paymentStatus: value as FilterState["paymentStatus"],
+              }))
+            }
+          >
+            <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-slate-900">
+              <SelectValue placeholder="Payment" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Payments</SelectItem>
+              {PAYMENT_STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
             value={filters.customerId}
             onValueChange={(value) =>
               setFilters((prev) => ({
@@ -604,7 +652,7 @@ export default function OrdersListPage() {
         </div>
 
         <Badge variant="secondary" className="w-fit text-sm">
-          Paid/Fulfilled: {paidOrdersCount}
+          Payments Completed: {paidOrdersCount}
         </Badge>
       </div>
 

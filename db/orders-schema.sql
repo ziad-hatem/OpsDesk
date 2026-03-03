@@ -17,12 +17,28 @@ exception
   when duplicate_object then null;
 end $$;
 
+do $$
+begin
+  create type public.order_payment_status as enum (
+    'unpaid',
+    'payment_link_sent',
+    'paid',
+    'failed',
+    'refunded',
+    'expired',
+    'cancelled'
+  );
+exception
+  when duplicate_object then null;
+end $$;
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   customer_id uuid not null references public.customers(id) on delete restrict,
   order_number varchar(50) not null,
   status public.order_status not null default 'draft',
+  payment_status public.order_payment_status not null default 'unpaid',
   currency char(3) not null,
   subtotal_amount bigint not null default 0 check (subtotal_amount >= 0),
   tax_amount bigint not null default 0 check (tax_amount >= 0),
@@ -32,6 +48,11 @@ create table if not exists public.orders (
   paid_at timestamp with time zone null,
   fulfilled_at timestamp with time zone null,
   cancelled_at timestamp with time zone null,
+  stripe_checkout_session_id varchar(255) null,
+  stripe_payment_intent_id varchar(255) null,
+  payment_link_url text null,
+  payment_link_sent_at timestamp with time zone null,
+  payment_completed_at timestamp with time zone null,
   notes text null,
   created_by uuid not null references public.users(id) on delete restrict,
   created_at timestamp with time zone not null default now(),
@@ -40,6 +61,29 @@ create table if not exists public.orders (
   constraint orders_totals_consistency_check
     check (total_amount = subtotal_amount + tax_amount - discount_amount)
 );
+
+do $$
+begin
+  if to_regclass('public.orders') is not null then
+    begin
+      alter table public.orders
+      add column if not exists payment_status public.order_payment_status not null default 'unpaid';
+    exception
+      when duplicate_column then null;
+    end;
+
+    alter table public.orders
+      add column if not exists stripe_checkout_session_id varchar(255);
+    alter table public.orders
+      add column if not exists stripe_payment_intent_id varchar(255);
+    alter table public.orders
+      add column if not exists payment_link_url text;
+    alter table public.orders
+      add column if not exists payment_link_sent_at timestamp with time zone;
+    alter table public.orders
+      add column if not exists payment_completed_at timestamp with time zone;
+  end if;
+end $$;
 
 create table if not exists public.order_items (
   id uuid primary key default gen_random_uuid(),
@@ -111,7 +155,16 @@ end $$;
 create index if not exists idx_orders_org on public.orders (organization_id);
 create index if not exists idx_orders_org_customer on public.orders (organization_id, customer_id);
 create index if not exists idx_orders_org_status on public.orders (organization_id, status);
+create index if not exists idx_orders_org_payment_status on public.orders (organization_id, payment_status);
 create index if not exists idx_orders_org_created_at on public.orders (organization_id, created_at desc);
+create unique index if not exists idx_orders_stripe_checkout_session_id_unique
+  on public.orders (stripe_checkout_session_id)
+  where stripe_checkout_session_id is not null;
+create index if not exists idx_orders_stripe_payment_intent_id
+  on public.orders (stripe_payment_intent_id)
+  where stripe_payment_intent_id is not null;
+create index if not exists idx_orders_org_payment_completed_at
+  on public.orders (organization_id, payment_completed_at desc);
 create index if not exists idx_order_items_order on public.order_items (order_id);
 create index if not exists idx_order_items_org_order on public.order_items (organization_id, order_id);
 create index if not exists idx_order_status_events_order_created_at

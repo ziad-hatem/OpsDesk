@@ -31,13 +31,28 @@ async function resolveActiveOrgId(
     return null;
   }
 
-  const { count, error } = await supabase
+  const membershipResultWithStatus = await supabase
     .from("organization_memberships")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .eq("organization_id", activeOrgFromCookie);
+    .eq("organization_id", activeOrgFromCookie)
+    .eq("status", "active");
 
-  if (error || !count) {
+  const shouldFallbackToLegacyMembershipQuery =
+    Boolean(membershipResultWithStatus.error) &&
+    membershipResultWithStatus.error?.message
+      .toLowerCase()
+      .includes("organization_memberships.status");
+
+  const membershipResult = shouldFallbackToLegacyMembershipQuery
+    ? await supabase
+        .from("organization_memberships")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("organization_id", activeOrgFromCookie)
+    : membershipResultWithStatus;
+
+  if (membershipResult.error || !membershipResult.count) {
     return null;
   }
 
