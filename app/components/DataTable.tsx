@@ -234,7 +234,10 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className={cn(cellPaddingClass, "text-slate-700")}
+                      className={cn(
+                        cellPaddingClass,
+                        "align-top !whitespace-normal break-words [overflow-wrap:anywhere] text-slate-700",
+                      )}
                       style={{ width: cell.column.getSize() }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
