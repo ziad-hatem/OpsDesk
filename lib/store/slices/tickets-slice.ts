@@ -20,6 +20,7 @@ import type {
   TicketUser,
   TicketsListResponse,
 } from "@/lib/tickets/types";
+import type { OrganizationRole } from "@/lib/topbar/types";
 
 type AsyncStatus = "idle" | "loading" | "succeeded" | "failed";
 
@@ -52,7 +53,9 @@ export interface FetchTicketsFilters {
   status?: "all" | TicketStatus;
   priority?: "all" | TicketPriority;
   assigneeId?: "all" | string;
+  assigneeRole?: "all" | OrganizationRole;
   customerId?: "all" | string;
+  tagIds?: string[];
   search?: string;
   createdFrom?: string;
   createdTo?: string;
@@ -228,8 +231,14 @@ export const fetchTickets = createAsyncThunk<
   if (filters?.assigneeId && filters.assigneeId !== "all") {
     params.set("assigneeId", filters.assigneeId);
   }
+  if (filters?.assigneeRole && filters.assigneeRole !== "all") {
+    params.set("assigneeRole", filters.assigneeRole);
+  }
   if (filters?.customerId && filters.customerId !== "all") {
     params.set("customerId", filters.customerId);
+  }
+  if (Array.isArray(filters?.tagIds) && filters.tagIds.length > 0) {
+    params.set("tagIds", filters.tagIds.join(","));
   }
   if (filters?.search?.trim()) {
     params.set("search", filters.search.trim());

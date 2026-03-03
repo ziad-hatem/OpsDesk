@@ -37,7 +37,11 @@ import type {
   OrdersListResponse,
   OrderStatus,
 } from "@/lib/orders/types";
-import type { SavedView, SavedViewsResponse } from "@/lib/saved-views/types";
+import type {
+  SavedView,
+  SavedViewsResponse,
+  SavedViewScope,
+} from "@/lib/saved-views/types";
 
 type FilterState = {
   status: "all" | OrderStatus;
@@ -105,6 +109,11 @@ const PAYMENT_STATUS_OPTIONS: Array<{ value: OrderPaymentStatus; label: string }
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const SAVE_SCOPE_OPTIONS: Array<{ value: SavedViewScope; label: string }> = [
+  { value: "personal", label: "My View" },
+  { value: "team", label: "Team View" },
+];
+
 function formatDateTime(isoDate: string | null) {
   if (!isoDate) {
     return "-";
@@ -132,6 +141,10 @@ function formatMoney(cents: number, currency: string) {
 function toCsvSafe(value: string) {
   const escaped = value.replace(/"/g, "\"\"");
   return `"${escaped}"`;
+}
+
+function formatSavedViewLabel(view: SavedView) {
+  return view.scope === "team" ? `Team - ${view.name}` : view.name;
 }
 
 function normalizeAmountInput(value: string): number | null {
@@ -197,6 +210,7 @@ export default function OrdersListPage() {
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState("none");
+  const [saveViewScope, setSaveViewScope] = useState<SavedViewScope>("personal");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -668,6 +682,7 @@ export default function OrdersListPage() {
           entityType: "orders",
           name: name.trim(),
           filters,
+          scope: saveViewScope,
         }),
       });
       if (!response.ok) {
@@ -837,7 +852,22 @@ export default function OrdersListPage() {
                 <SelectItem value="none">No saved view</SelectItem>
                 {savedViews.map((view) => (
                   <SelectItem key={view.id} value={view.id}>
-                    {view.name}
+                    {formatSavedViewLabel(view)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={saveViewScope}
+              onValueChange={(value) => setSaveViewScope(value as SavedViewScope)}
+            >
+              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Scope" />
+              </SelectTrigger>
+              <SelectContent>
+                {SAVE_SCOPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>

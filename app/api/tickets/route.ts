@@ -21,11 +21,13 @@ import {
   normalizeTicketPriority,
   normalizeTicketStatus,
 } from "@/lib/tickets/validation";
+import { isOrganizationRole } from "@/lib/team/validation";
 import {
   isMissingTableInSchemaCache,
   missingTableMessage,
   missingTableMessageWithMigration,
 } from "@/lib/tickets/errors";
+import type { OrganizationRole } from "@/lib/topbar/types";
 
 type TicketRow = Omit<TicketListItem, "assignee" | "creator" | "customer">;
 type UserRow = TicketUser;
@@ -37,6 +39,8 @@ type OrderAccessRow = {
 
 type MembershipUserRow = {
   user_id: string;
+  role?: OrganizationRole;
+  status?: "active" | "suspended" | null;
   users:
     | {
         id: string;
@@ -51,6 +55,23 @@ type MembershipUserRow = {
         avatar_url: string | null;
       }>
     | null;
+};
+
+type MembershipRoleRow = {
+  user_id: string;
+  role: OrganizationRole;
+  status?: "active" | "suspended" | null;
+};
+
+type MembershipRoleFallbackRow = Omit<MembershipRoleRow, "status">;
+
+type TicketTagRow = {
+  id: string;
+};
+
+type TicketTagAssignmentRow = {
+  ticket_id: string;
+  tag_id: string;
 };
 
 type CreateTicketBody = {
@@ -97,6 +118,29 @@ function normalizeIsoDateQueryParam(value: string | null): string | null {
   return parsed.toISOString();
 }
 
+function normalizeUuidListQueryParam(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function isMissingTicketTagsSchema(error: { message?: string } | null | undefined): boolean {
+  const message = (error?.message ?? "").toLowerCase();
+  return (
+    (message.includes("ticket_tags") || message.includes("ticket_tag_assignments")) &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
 function normalizeUserFromMembership(row: MembershipUserRow): UserRow | null {
   const user = Array.isArray(row.users) ? row.users[0] : row.users;
   if (!user) {
@@ -129,10 +173,137 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const assigneeId = searchParams.get("assigneeId");
+    const assigneeRoleRaw = searchParams.get("assigneeRole");
     const customerId = searchParams.get("customerId");
+    const tagIds = normalizeUuidListQueryParam(searchParams.get("tagIds"));
     const createdFrom = normalizeIsoDateQueryParam(searchParams.get("createdFrom"));
     const createdTo = normalizeIsoDateQueryParam(searchParams.get("createdTo"));
     const search = searchParams.get("search")?.trim() ?? "";
+    const assigneeRole =
+      assigneeRoleRaw && assigneeRoleRaw !== "all" ? assigneeRoleRaw : null;
+
+    if (assigneeRole && !isOrganizationRole(assigneeRole)) {
+      return NextResponse.json(
+        { error: "assigneeRole must be one of admin, manager, support, read_only" },
+        { status: 400 },
+      );
+    }
+
+    let roleFilteredAssigneeIds: string[] | null = null;
+    if (assigneeRole) {
+      const membershipQueryWithStatus = await supabase
+        .from("organization_memberships")
+        .select("user_id, role, status")
+        .eq("organization_id", activeOrgId)
+        .eq("role", assigneeRole)
+        .eq("status", "active")
+        .returns<MembershipRoleRow[]>();
+
+      let membershipRows = membershipQueryWithStatus.data ?? [];
+      let membershipError = membershipQueryWithStatus.error;
+
+      const isMissingStatusColumn =
+        membershipError?.message?.toLowerCase().includes("organization_memberships.status") ??
+        false;
+      if (membershipError && isMissingStatusColumn) {
+        const fallbackMembershipQuery = await supabase
+          .from("organization_memberships")
+          .select("user_id, role")
+          .eq("organization_id", activeOrgId)
+          .eq("role", assigneeRole)
+          .returns<MembershipRoleFallbackRow[]>();
+
+        membershipRows = fallbackMembershipQuery.data ?? [];
+        membershipError = fallbackMembershipQuery.error;
+      }
+
+      if (membershipError) {
+        return NextResponse.json(
+          { error: `Failed to filter by assignee role: ${membershipError.message}` },
+          { status: 500 },
+        );
+      }
+
+      roleFilteredAssigneeIds = Array.from(
+        new Set(membershipRows.map((row) => row.user_id)),
+      );
+    }
+
+    let tagFilteredTicketIds: string[] | null = null;
+    if (tagIds.length > 0) {
+      const { data: tagRows, error: tagsError } = await supabase
+        .from("ticket_tags")
+        .select("id")
+        .eq("organization_id", activeOrgId)
+        .in("id", tagIds)
+        .returns<TicketTagRow[]>();
+
+      if (tagsError) {
+        if (isMissingTicketTagsSchema(tagsError)) {
+          return NextResponse.json(
+            {
+              error: missingTableMessageWithMigration(
+                "ticket_tags",
+                "db/ticket-tags-schema.sql",
+              ),
+            },
+            { status: 500 },
+          );
+        }
+
+        return NextResponse.json(
+          { error: `Failed to validate ticket tags: ${tagsError.message}` },
+          { status: 500 },
+        );
+      }
+
+      if ((tagRows ?? []).length !== tagIds.length) {
+        return NextResponse.json(
+          { error: "One or more tag ids are invalid for this organization" },
+          { status: 400 },
+        );
+      }
+
+      const { data: assignmentRows, error: assignmentsError } = await supabase
+        .from("ticket_tag_assignments")
+        .select("ticket_id, tag_id")
+        .eq("organization_id", activeOrgId)
+        .in("tag_id", tagIds)
+        .returns<TicketTagAssignmentRow[]>();
+
+      if (assignmentsError) {
+        if (isMissingTicketTagsSchema(assignmentsError)) {
+          return NextResponse.json(
+            {
+              error: missingTableMessageWithMigration(
+                "ticket_tag_assignments",
+                "db/ticket-tags-schema.sql",
+              ),
+            },
+            { status: 500 },
+          );
+        }
+
+        return NextResponse.json(
+          { error: `Failed to filter tickets by tags: ${assignmentsError.message}` },
+          { status: 500 },
+        );
+      }
+
+      const matchedTagsByTicketId = new Map<string, Set<string>>();
+      for (const row of assignmentRows ?? []) {
+        const existing = matchedTagsByTicketId.get(row.ticket_id);
+        if (existing) {
+          existing.add(row.tag_id);
+          continue;
+        }
+        matchedTagsByTicketId.set(row.ticket_id, new Set([row.tag_id]));
+      }
+
+      tagFilteredTicketIds = Array.from(matchedTagsByTicketId.entries())
+        .filter(([, matchedTagIds]) => matchedTagIds.size === tagIds.length)
+        .map(([ticketId]) => ticketId);
+    }
 
     let query = supabase
       .from("tickets")
@@ -149,11 +320,34 @@ export async function GET(req: Request) {
     if (priority && priority !== "all" && isTicketPriority(priority)) {
       query = query.eq("priority", priority);
     }
+
+    let shouldSkipTicketFetch = false;
     if (assigneeId && assigneeId !== "all") {
-      query = query.eq("assignee_id", assigneeId);
+      if (
+        roleFilteredAssigneeIds &&
+        !roleFilteredAssigneeIds.includes(assigneeId)
+      ) {
+        shouldSkipTicketFetch = true;
+      } else {
+        query = query.eq("assignee_id", assigneeId);
+      }
+    } else if (roleFilteredAssigneeIds) {
+      if (roleFilteredAssigneeIds.length === 0) {
+        shouldSkipTicketFetch = true;
+      } else {
+        query = query.in("assignee_id", roleFilteredAssigneeIds);
+      }
     }
+
     if (customerId && customerId !== "all") {
       query = query.eq("customer_id", customerId);
+    }
+    if (tagFilteredTicketIds) {
+      if (tagFilteredTicketIds.length === 0) {
+        shouldSkipTicketFetch = true;
+      } else {
+        query = query.in("id", tagFilteredTicketIds);
+      }
     }
     if (createdFrom) {
       query = query.gte("created_at", createdFrom);
@@ -170,22 +364,26 @@ export async function GET(req: Request) {
       }
     }
 
-    const { data: ticketsData, error: ticketsError } = await query.returns<TicketRow[]>();
+    let tickets: TicketRow[] = [];
+    if (!shouldSkipTicketFetch) {
+      const { data: ticketsData, error: ticketsError } = await query.returns<TicketRow[]>();
 
-    if (ticketsError) {
-      if (isMissingTableInSchemaCache(ticketsError, "tickets")) {
+      if (ticketsError) {
+        if (isMissingTableInSchemaCache(ticketsError, "tickets")) {
+          return NextResponse.json(
+            { error: missingTableMessage("tickets") },
+            { status: 500 },
+          );
+        }
         return NextResponse.json(
-          { error: missingTableMessage("tickets") },
+          { error: `Failed to load tickets: ${ticketsError.message}` },
           { status: 500 },
         );
       }
-      return NextResponse.json(
-        { error: `Failed to load tickets: ${ticketsError.message}` },
-        { status: 500 },
-      );
+
+      tickets = ticketsData ?? [];
     }
 
-    const tickets = ticketsData ?? [];
     const userIds = Array.from(
       new Set(
         tickets

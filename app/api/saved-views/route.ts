@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
-import type { SavedView, SavedViewEntityType, SavedViewsResponse } from "@/lib/saved-views/types";
+import type {
+  SavedView,
+  SavedViewEntityType,
+  SavedViewScope,
+  SavedViewsResponse,
+} from "@/lib/saved-views/types";
+import type { OrganizationRole } from "@/lib/topbar/types";
 
 type SavedViewRow = SavedView;
 
@@ -9,7 +15,15 @@ type CreateSavedViewBody = {
   name?: string;
   filters?: Record<string, unknown>;
   isFavorite?: boolean;
+  scope?: string;
 };
+
+type MembershipRow = {
+  role: OrganizationRole;
+  status?: "active" | "suspended" | null;
+};
+
+type MembershipFallbackRow = Omit<MembershipRow, "status">;
 
 function isSavedViewEntityType(value: unknown): value is SavedViewEntityType {
   return value === "tickets" || value === "orders" || value === "customers";
@@ -33,6 +47,10 @@ function normalizeFilters(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function normalizeScope(value: unknown): SavedViewScope {
+  return value === "team" ? "team" : "personal";
+}
+
 function isMissingSavedViewsTable(error: { message?: string } | null | undefined): boolean {
   const message = (error?.message ?? "").toLowerCase();
   if (!message) {
@@ -40,6 +58,45 @@ function isMissingSavedViewsTable(error: { message?: string } | null | undefined
   }
 
   return message.includes("saved_views") && message.includes("schema cache");
+}
+
+async function resolveActorRole(params: {
+  supabase: ReturnType<typeof import("@/lib/supabase-admin").createSupabaseAdminClient>;
+  activeOrgId: string;
+  userId: string;
+}): Promise<OrganizationRole | null> {
+  const { supabase, activeOrgId, userId } = params;
+
+  const membershipResultWithStatus = await supabase
+    .from("organization_memberships")
+    .select("role, status")
+    .eq("organization_id", activeOrgId)
+    .eq("user_id", userId)
+    .maybeSingle<MembershipRow>();
+
+  if (!membershipResultWithStatus.error) {
+    const membership = membershipResultWithStatus.data;
+    if (!membership || membership.status === "suspended") {
+      return null;
+    }
+    return membership.role;
+  }
+
+  const isMissingStatusColumn = membershipResultWithStatus.error.message
+    .toLowerCase()
+    .includes("organization_memberships.status");
+  if (!isMissingStatusColumn) {
+    return null;
+  }
+
+  const fallbackResult = await supabase
+    .from("organization_memberships")
+    .select("role")
+    .eq("organization_id", activeOrgId)
+    .eq("user_id", userId)
+    .maybeSingle<MembershipFallbackRow>();
+
+  return fallbackResult.data?.role ?? null;
 }
 
 export async function GET(req: Request) {
@@ -65,17 +122,41 @@ export async function GET(req: Request) {
     );
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("saved_views")
     .select(
-      "id, organization_id, user_id, entity_type, name, filters, is_favorite, created_at, updated_at",
+      "id, organization_id, user_id, entity_type, scope, name, filters, is_favorite, created_at, updated_at",
     )
     .eq("organization_id", activeOrgId)
-    .eq("user_id", userId)
     .eq("entity_type", entityType)
+    .or(`user_id.eq.${userId},scope.eq.team`)
     .order("is_favorite", { ascending: false })
-    .order("created_at", { ascending: false })
-    .returns<SavedViewRow[]>();
+    .order("created_at", { ascending: false });
+
+  let { data, error } = await query.returns<SavedViewRow[]>();
+
+  if (
+    error &&
+    error.message.toLowerCase().includes("saved_views.scope")
+  ) {
+    const legacyResult = await supabase
+      .from("saved_views")
+      .select(
+        "id, organization_id, user_id, entity_type, name, filters, is_favorite, created_at, updated_at",
+      )
+      .eq("organization_id", activeOrgId)
+      .eq("entity_type", entityType)
+      .eq("user_id", userId)
+      .order("is_favorite", { ascending: false })
+      .order("created_at", { ascending: false })
+      .returns<Array<Omit<SavedViewRow, "scope">>>();
+
+    data = (legacyResult.data ?? []).map((row) => ({
+      ...row,
+      scope: "personal",
+    }));
+    error = legacyResult.error;
+  }
 
   if (error) {
     if (isMissingSavedViewsTable(error)) {
@@ -139,6 +220,17 @@ export async function POST(req: Request) {
   }
 
   const filters = normalizeFilters(body.filters);
+  const scope = normalizeScope(body.scope);
+
+  if (scope === "team") {
+    const actorRole = await resolveActorRole({ supabase, activeOrgId, userId });
+    if (!actorRole || (actorRole !== "admin" && actorRole !== "manager")) {
+      return NextResponse.json(
+        { error: "Only admins or managers can create team views" },
+        { status: 403 },
+      );
+    }
+  }
 
   const { data, error } = await supabase
     .from("saved_views")
@@ -146,12 +238,13 @@ export async function POST(req: Request) {
       organization_id: activeOrgId,
       user_id: userId,
       entity_type: body.entityType,
+      scope,
       name,
       filters,
       is_favorite: Boolean(body.isFavorite),
     })
     .select(
-      "id, organization_id, user_id, entity_type, name, filters, is_favorite, created_at, updated_at",
+      "id, organization_id, user_id, entity_type, scope, name, filters, is_favorite, created_at, updated_at",
     )
     .single<SavedViewRow>();
 

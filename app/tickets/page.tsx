@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Download, Loader2 } from "lucide-react";
+import { Check, ChevronDown, Download, Loader2, Plus } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { DataTable } from "../components/DataTable";
@@ -27,6 +27,12 @@ import {
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
+import { Checkbox } from "../components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
   createTicket,
@@ -38,19 +44,27 @@ import {
 } from "@/lib/store/slices/tickets-slice";
 import { selectTopbarActiveOrganizationId } from "@/lib/store/slices/topbar-slice";
 import type { CustomerListItem, CustomersListResponse } from "@/lib/customers/types";
-import type { SavedView, SavedViewsResponse } from "@/lib/saved-views/types";
+import type {
+  SavedView,
+  SavedViewsResponse,
+  SavedViewScope,
+} from "@/lib/saved-views/types";
+import type { TicketTag, TicketTagsResponse } from "@/lib/ticket-tags/types";
 import type {
   TicketListItem,
   TicketPriority,
   TicketStatus,
   TicketUser,
 } from "@/lib/tickets/types";
+import type { OrganizationRole } from "@/lib/topbar/types";
 
 type FilterState = {
   status: "all" | TicketStatus;
   priority: "all" | TicketPriority;
   assigneeId: "all" | string;
+  assigneeRole: "all" | OrganizationRole;
   customerId: "all" | string;
+  tagIds: string[];
   search: string;
   createdFrom: string;
   createdTo: string;
@@ -90,11 +104,41 @@ const PRIORITY_FILTER_OPTIONS: Array<{ value: FilterState["priority"]; label: st
   { value: "low", label: "Low" },
 ];
 
+const ROLE_FILTER_OPTIONS: Array<{ value: FilterState["assigneeRole"]; label: string }> = [
+  { value: "all", label: "All Org Roles" },
+  { value: "admin", label: "Admin" },
+  { value: "manager", label: "Manager" },
+  { value: "support", label: "Support" },
+  { value: "read_only", label: "Read-only" },
+];
+
+const SAVE_SCOPE_OPTIONS: Array<{ value: SavedViewScope; label: string }> = [
+  { value: "personal", label: "My View" },
+  { value: "team", label: "Team View" },
+];
+
 function formatUserDisplay(user: TicketUser | null) {
   if (!user) {
     return "Unassigned";
   }
   return user.name?.trim() || user.email;
+}
+
+function formatSavedViewLabel(view: SavedView) {
+  return view.scope === "team" ? `Team - ${view.name}` : view.name;
+}
+
+function formatTagFilterLabel(tags: TicketTag[], selectedTagIds: string[]) {
+  if (!selectedTagIds.length) {
+    return "All Tags";
+  }
+
+  if (selectedTagIds.length === 1) {
+    const matchedTag = tags.find((tag) => tag.id === selectedTagIds[0]);
+    return matchedTag ? matchedTag.name : "1 Tag";
+  }
+
+  return `${selectedTagIds.length} Tags`;
 }
 
 function formatDateTime(isoDate: string) {
@@ -118,7 +162,12 @@ function parseTicketFiltersFromSavedView(filters: Record<string, unknown>): Filt
   const status = typeof filters.status === "string" ? filters.status : "all";
   const priority = typeof filters.priority === "string" ? filters.priority : "all";
   const assigneeId = typeof filters.assigneeId === "string" ? filters.assigneeId : "all";
+  const assigneeRole =
+    typeof filters.assigneeRole === "string" ? filters.assigneeRole : "all";
   const customerId = typeof filters.customerId === "string" ? filters.customerId : "all";
+  const tagIds = Array.isArray(filters.tagIds)
+    ? filters.tagIds.filter((value): value is string => typeof value === "string")
+    : [];
   const search = typeof filters.search === "string" ? filters.search : "";
   const createdFrom = typeof filters.createdFrom === "string" ? filters.createdFrom : "";
   const createdTo = typeof filters.createdTo === "string" ? filters.createdTo : "";
@@ -127,7 +176,9 @@ function parseTicketFiltersFromSavedView(filters: Record<string, unknown>): Filt
     status: status as FilterState["status"],
     priority: priority as FilterState["priority"],
     assigneeId,
+    assigneeRole: assigneeRole as FilterState["assigneeRole"],
     customerId,
+    tagIds,
     search,
     createdFrom,
     createdTo,
@@ -147,13 +198,17 @@ export default function TicketsListPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState<CreateTicketForm>(INITIAL_CREATE_FORM);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [ticketTags, setTicketTags] = useState<TicketTag[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState<string>("none");
+  const [saveViewScope, setSaveViewScope] = useState<SavedViewScope>("personal");
   const [filters, setFilters] = useState<FilterState>({
     status: "all",
     priority: "all",
     assigneeId: "all",
+    assigneeRole: "all",
     customerId: "all",
+    tagIds: [],
     search: "",
     createdFrom: "",
     createdTo: "",
@@ -202,6 +257,58 @@ export default function TicketsListPage() {
       setCustomers([]);
     }
 
+    return () => {
+      isMounted = false;
+    };
+  }, [activeOrgId]);
+
+  useEffect(() => {
+    const allowedTagIds = new Set(ticketTags.map((tag) => tag.id));
+    setFilters((prev) => {
+      const nextTagIds = prev.tagIds.filter((tagId) => allowedTagIds.has(tagId));
+      if (nextTagIds.length === prev.tagIds.length) {
+        return prev;
+      }
+      return { ...prev, tagIds: nextTagIds };
+    });
+  }, [ticketTags]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTicketTags = async () => {
+      if (!activeOrgId) {
+        if (isMounted) {
+          setTicketTags([]);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/ticket-tags", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (isMounted) {
+            setTicketTags([]);
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as TicketTagsResponse;
+        if (isMounted) {
+          setTicketTags(payload.tags ?? []);
+        }
+      } catch {
+        if (isMounted) {
+          setTicketTags([]);
+        }
+      }
+    };
+
+    void loadTicketTags();
     return () => {
       isMounted = false;
     };
@@ -381,6 +488,16 @@ export default function TicketsListPage() {
     setFilters(parseTicketFiltersFromSavedView(view.filters));
   };
 
+  const handleToggleTag = (tagId: string) => {
+    setFilters((prev) => {
+      const hasTag = prev.tagIds.includes(tagId);
+      const tagIds = hasTag
+        ? prev.tagIds.filter((id) => id !== tagId)
+        : [...prev.tagIds, tagId];
+      return { ...prev, tagIds };
+    });
+  };
+
   const handleSaveCurrentView = async () => {
     const name = window.prompt("Saved view name");
     if (!name?.trim()) {
@@ -397,6 +514,7 @@ export default function TicketsListPage() {
           entityType: "tickets",
           name: name.trim(),
           filters,
+          scope: saveViewScope,
         }),
       });
       if (!response.ok) {
@@ -572,6 +690,27 @@ export default function TicketsListPage() {
             </Select>
 
             <Select
+              value={filters.assigneeRole}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  assigneeRole: value as FilterState["assigneeRole"],
+                }))
+              }
+            >
+              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Org Role" />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLE_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
               value={filters.customerId}
               onValueChange={(value) =>
                 setFilters((prev) => ({
@@ -592,6 +731,69 @@ export default function TicketsListPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-[220px] justify-between focus:ring-2 focus:ring-slate-900"
+                >
+                  <span className="truncate">
+                    {formatTagFilterLabel(ticketTags, filters.tagIds)}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-slate-500" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[280px] p-0">
+                <div className="border-b border-slate-200 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Filter by tags
+                </div>
+                {ticketTags.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-slate-500">No tags created yet</div>
+                ) : (
+                  <div className="max-h-56 space-y-1 overflow-y-auto px-3 py-2">
+                    {ticketTags.map((tag) => {
+                      const checked = filters.tagIds.includes(tag.id);
+                      return (
+                        <label
+                          key={tag.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => handleToggleTag(tag.id)}
+                          />
+                          <span className="truncate">{tag.name}</span>
+                          {tag.color ? (
+                            <span
+                              className="ml-auto inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                          ) : null}
+                          {checked ? <Check className="h-3.5 w-3.5 text-slate-500" /> : null}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {filters.tagIds.length > 0 ? (
+                  <div className="border-t border-slate-200 p-2">
+                    <Button
+                      variant="ghost"
+                      className="h-8 w-full justify-center text-xs"
+                      onClick={() =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          tagIds: [],
+                        }))
+                      }
+                    >
+                      Clear tag filters
+                    </Button>
+                  </div>
+                ) : null}
+              </PopoverContent>
+            </Popover>
 
             <Input
               type="date"
@@ -620,7 +822,22 @@ export default function TicketsListPage() {
                 <SelectItem value="none">No saved view</SelectItem>
                 {savedViews.map((view) => (
                   <SelectItem key={view.id} value={view.id}>
-                    {view.name}
+                    {formatSavedViewLabel(view)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={saveViewScope}
+              onValueChange={(value) => setSaveViewScope(value as SavedViewScope)}
+            >
+              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Scope" />
+              </SelectTrigger>
+              <SelectContent>
+                {SAVE_SCOPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>

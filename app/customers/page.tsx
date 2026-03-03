@@ -28,7 +28,11 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { useAppSelector } from "@/lib/store/hooks";
 import { selectTopbarActiveOrganizationId } from "@/lib/store/slices/topbar-slice";
-import type { SavedView, SavedViewsResponse } from "@/lib/saved-views/types";
+import type {
+  SavedView,
+  SavedViewsResponse,
+  SavedViewScope,
+} from "@/lib/saved-views/types";
 import type {
   CustomerListItem,
   CustomersListResponse,
@@ -63,6 +67,11 @@ const STATUS_FILTER_OPTIONS: Array<{ value: FilterState["status"]; label: string
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
   { value: "blocked", label: "Blocked" },
+];
+
+const SAVE_SCOPE_OPTIONS: Array<{ value: SavedViewScope; label: string }> = [
+  { value: "personal", label: "My View" },
+  { value: "team", label: "Team View" },
 ];
 
 function parseCustomerFiltersFromSavedView(filters: Record<string, unknown>): FilterState {
@@ -105,6 +114,10 @@ function toCsvSafe(value: string) {
   return `"${escaped}"`;
 }
 
+function formatSavedViewLabel(view: SavedView) {
+  return view.scope === "team" ? `Team - ${view.name}` : view.name;
+}
+
 export default function CustomersListPage() {
   const router = useRouter();
   const activeOrgId = useAppSelector(selectTopbarActiveOrganizationId);
@@ -112,6 +125,7 @@ export default function CustomersListPage() {
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState("none");
+  const [saveViewScope, setSaveViewScope] = useState<SavedViewScope>("personal");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -397,6 +411,7 @@ export default function CustomersListPage() {
           entityType: "customers",
           name: name.trim(),
           filters,
+          scope: saveViewScope,
         }),
       });
       if (!response.ok) {
@@ -516,7 +531,22 @@ export default function CustomersListPage() {
                 <SelectItem value="none">No saved view</SelectItem>
                 {savedViews.map((view) => (
                   <SelectItem key={view.id} value={view.id}>
-                    {view.name}
+                    {formatSavedViewLabel(view)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={saveViewScope}
+              onValueChange={(value) => setSaveViewScope(value as SavedViewScope)}
+            >
+              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Scope" />
+              </SelectTrigger>
+              <SelectContent>
+                {SAVE_SCOPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>

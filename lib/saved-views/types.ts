@@ -1,10 +1,12 @@
 export type SavedViewEntityType = "tickets" | "orders" | "customers";
+export type SavedViewScope = "personal" | "team";
 
 export interface SavedView {
   id: string;
   organization_id: string;
   user_id: string;
   entity_type: SavedViewEntityType;
+  scope: SavedViewScope;
   name: string;
   filters: Record<string, unknown>;
   is_favorite: boolean;
