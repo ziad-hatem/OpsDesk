@@ -50,6 +50,17 @@ function normalizeEmail(value: unknown): string | null {
   return normalized.toLowerCase();
 }
 
+function normalizeIsoDateQueryParam(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString();
+}
+
 function getRevenueDeltaFromOrder(row: OrderCountRow): number {
   if (row.status === "paid" || row.status === "fulfilled") {
     return row.total_amount;
@@ -77,6 +88,8 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const statusFilter = searchParams.get("status");
+    const createdFrom = normalizeIsoDateQueryParam(searchParams.get("createdFrom"));
+    const createdTo = normalizeIsoDateQueryParam(searchParams.get("createdTo"));
     const search = searchParams.get("search")?.trim() ?? "";
     const limitParam = Number(searchParams.get("limit") ?? "200");
     const limit = Number.isFinite(limitParam)
@@ -92,6 +105,12 @@ export async function GET(req: Request) {
 
     if (statusFilter && statusFilter !== "all" && isCustomerStatus(statusFilter)) {
       query = query.eq("status", statusFilter);
+    }
+    if (createdFrom) {
+      query = query.gte("created_at", createdFrom);
+    }
+    if (createdTo) {
+      query = query.lte("created_at", createdTo);
     }
 
     if (search.length > 0) {

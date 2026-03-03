@@ -42,6 +42,19 @@ type OpenTicketRow = {
   sla_due_at: string | null;
 };
 
+type ResolvedTicketRow = {
+  id: string;
+  status: "resolved" | "closed";
+  updated_at: string;
+  closed_at: string | null;
+};
+
+type SlaBreachEventRow = {
+  ticket_id: string;
+  event_type: "resolution_breached";
+  created_at: string;
+};
+
 function startOfDay(date: Date) {
   const cloned = new Date(date);
   cloned.setHours(0, 0, 0, 0);
@@ -96,6 +109,25 @@ function toTicketCode(ticketId: string) {
   return `TKT-${ticketId.slice(0, 8).toUpperCase()}`;
 }
 
+function toDayKey(dateIso: string): string {
+  return dateIso.slice(0, 10);
+}
+
+function safeDate(value: string | null): Date | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 export async function GET(req: Request) {
   const ctxResult = await getTicketRequestContext();
   if (!ctxResult.ok) {
@@ -140,7 +172,15 @@ export async function GET(req: Request) {
 
   const queryStart = previousFrom.toISOString();
 
-  const [ordersWindowResult, recentOrdersResult, openTicketsResult, highPriorityTicketsResult, customersResult] =
+  const [
+    ordersWindowResult,
+    recentOrdersResult,
+    openTicketsResult,
+    highPriorityTicketsResult,
+    customersResult,
+    resolvedTicketsResult,
+    slaBreachEventsResult,
+  ] =
     await Promise.all([
     supabase
       .from("orders")
@@ -183,6 +223,22 @@ export async function GET(req: Request) {
       .select("id, name")
       .eq("organization_id", activeOrgId)
       .returns<CustomerRow[]>(),
+    supabase
+      .from("tickets")
+      .select("id, status, updated_at, closed_at")
+      .eq("organization_id", activeOrgId)
+      .in("status", ["resolved", "closed"])
+      .or(`updated_at.gte.${from.toISOString()},closed_at.gte.${from.toISOString()}`)
+      .lte("updated_at", to.toISOString())
+      .returns<ResolvedTicketRow[]>(),
+    supabase
+      .from("ticket_sla_events")
+      .select("ticket_id, event_type, created_at")
+      .eq("organization_id", activeOrgId)
+      .eq("event_type", "resolution_breached")
+      .gte("created_at", from.toISOString())
+      .lte("created_at", to.toISOString())
+      .returns<SlaBreachEventRow[]>(),
     ]);
 
   if (ordersWindowResult.error) {
@@ -252,11 +308,36 @@ export async function GET(req: Request) {
     );
   }
 
+  if (resolvedTicketsResult.error) {
+    if (isMissingTableInSchemaCache(resolvedTicketsResult.error, "tickets")) {
+      return NextResponse.json(
+        { error: missingTableMessageWithMigration("tickets", "db/tickets-schema.sql") },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json(
+      { error: `Failed to load resolved tickets for dashboard: ${resolvedTicketsResult.error.message}` },
+      { status: 500 },
+    );
+  }
+
+  if (
+    slaBreachEventsResult.error &&
+    !isMissingTableInSchemaCache(slaBreachEventsResult.error, "ticket_sla_events")
+  ) {
+    return NextResponse.json(
+      { error: `Failed to load SLA breach events for dashboard: ${slaBreachEventsResult.error.message}` },
+      { status: 500 },
+    );
+  }
+
   const orders = ordersWindowResult.data ?? [];
   const recentOrdersRows = recentOrdersResult.data ?? [];
   const openTicketsRows = openTicketsResult.data ?? [];
   const highPriorityTicketsRows = highPriorityTicketsResult.data ?? [];
   const customers = customersResult.data ?? [];
+  const resolvedTicketsRows = resolvedTicketsResult.data ?? [];
+  const slaBreachEventsRows = slaBreachEventsResult.data ?? [];
 
   const customersById = new Map(customers.map((customer) => [customer.id, customer.name]));
 
@@ -326,6 +407,59 @@ export async function GET(req: Request) {
     return Number.isFinite(dueTime) && dueTime < now;
   }).length;
 
+  const resolvedCountsByDay = new Map<string, number>();
+  const breachesByDay = new Map<string, number>();
+
+  for (const ticket of resolvedTicketsRows) {
+    const resolvedAt = safeDate(ticket.closed_at ?? ticket.updated_at);
+    if (!resolvedAt) {
+      continue;
+    }
+    if (resolvedAt.getTime() < from.getTime() || resolvedAt.getTime() > to.getTime()) {
+      continue;
+    }
+    const dayKey = toDayKey(resolvedAt.toISOString());
+    resolvedCountsByDay.set(dayKey, (resolvedCountsByDay.get(dayKey) ?? 0) + 1);
+  }
+
+  for (const event of slaBreachEventsRows) {
+    const eventDate = safeDate(event.created_at);
+    if (!eventDate) {
+      continue;
+    }
+    const dayKey = toDayKey(eventDate.toISOString());
+    breachesByDay.set(dayKey, (breachesByDay.get(dayKey) ?? 0) + 1);
+  }
+
+  const slaComplianceTrend: DashboardResponse["slaComplianceTrend"] = [];
+  let resolvedTotal = 0;
+  let breachesTotal = 0;
+  for (let index = 0; index < currentRangeDays; index += 1) {
+    const day = new Date(from);
+    day.setDate(day.getDate() + index);
+    const dayKey = toDayKey(day.toISOString());
+    const resolvedCount = resolvedCountsByDay.get(dayKey) ?? 0;
+    const breachesCount = Math.min(breachesByDay.get(dayKey) ?? 0, resolvedCount);
+    const compliance =
+      resolvedCount > 0
+        ? roundOne(Math.max(0, ((resolvedCount - breachesCount) / resolvedCount) * 100))
+        : 100;
+
+    resolvedTotal += resolvedCount;
+    breachesTotal += breachesCount;
+    slaComplianceTrend.push({
+      label: formatChartLabel(day),
+      resolved: resolvedCount,
+      breaches: breachesCount,
+      compliance,
+    });
+  }
+
+  const slaComplianceRate =
+    resolvedTotal > 0
+      ? roundOne(Math.max(0, ((resolvedTotal - breachesTotal) / resolvedTotal) * 100))
+      : 100;
+
   const recentOrders: DashboardRecentOrder[] = recentOrdersRows
     .map((order) => ({
       id: order.id,
@@ -352,8 +486,10 @@ export async function GET(req: Request) {
       totalRevenueAmount,
       openTicketsCount,
       slaBreachesCount,
+      slaComplianceRate,
     },
     chart: chartPoints,
+    slaComplianceTrend,
     recentOrders,
     highPriorityTickets,
     activeOrgId,

@@ -52,6 +52,10 @@ export interface FetchTicketsFilters {
   status?: "all" | TicketStatus;
   priority?: "all" | TicketPriority;
   assigneeId?: "all" | string;
+  customerId?: "all" | string;
+  search?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }
 
 export interface CreateTicketPayload {
@@ -223,6 +227,18 @@ export const fetchTickets = createAsyncThunk<
   }
   if (filters?.assigneeId && filters.assigneeId !== "all") {
     params.set("assigneeId", filters.assigneeId);
+  }
+  if (filters?.customerId && filters.customerId !== "all") {
+    params.set("customerId", filters.customerId);
+  }
+  if (filters?.search?.trim()) {
+    params.set("search", filters.search.trim());
+  }
+  if (filters?.createdFrom?.trim()) {
+    params.set("createdFrom", filters.createdFrom.trim());
+  }
+  if (filters?.createdTo?.trim()) {
+    params.set("createdTo", filters.createdTo.trim());
   }
 
   const response = await fetch(

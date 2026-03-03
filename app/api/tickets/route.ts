@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import {
+  computeResolutionDueAtFromPolicy,
+  getSlaPolicyByPriority,
+  runSlaEscalationEngine,
+} from "@/lib/server/sla-engine";
+import {
   getUniqueRecipientIds,
   insertAppNotifications,
 } from "@/lib/server/notifications";
@@ -81,6 +86,17 @@ function normalizeIsoDate(value: unknown): string | null {
   return parsed.toISOString();
 }
 
+function normalizeIsoDateQueryParam(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString();
+}
+
 function normalizeUserFromMembership(row: MembershipUserRow): UserRow | null {
   const user = Array.isArray(row.users) ? row.users[0] : row.users;
   if (!user) {
@@ -113,6 +129,9 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const assigneeId = searchParams.get("assigneeId");
+    const customerId = searchParams.get("customerId");
+    const createdFrom = normalizeIsoDateQueryParam(searchParams.get("createdFrom"));
+    const createdTo = normalizeIsoDateQueryParam(searchParams.get("createdTo"));
     const search = searchParams.get("search")?.trim() ?? "";
 
     let query = supabase
@@ -132,6 +151,15 @@ export async function GET(req: Request) {
     }
     if (assigneeId && assigneeId !== "all") {
       query = query.eq("assignee_id", assigneeId);
+    }
+    if (customerId && customerId !== "all") {
+      query = query.eq("customer_id", customerId);
+    }
+    if (createdFrom) {
+      query = query.gte("created_at", createdFrom);
+    }
+    if (createdTo) {
+      query = query.lte("created_at", createdTo);
     }
     if (search.length > 0) {
       const safeSearch = search.replace(/[%_,]/g, "");
@@ -286,6 +314,8 @@ export async function POST(req: Request) {
     let resolvedCustomerId = customerId;
     const slaDueAtRaw = body.slaDueAt;
     const slaDueAt = normalizeIsoDate(slaDueAtRaw);
+    const ticketCreatedAt = new Date().toISOString();
+    let resolvedSlaDueAt = slaDueAt;
 
     if (!title) {
       return NextResponse.json({ error: "Ticket title is required" }, { status: 400 });
@@ -388,6 +418,20 @@ export async function POST(req: Request) {
       }
     }
 
+    if (!resolvedSlaDueAt) {
+      const policy = await getSlaPolicyByPriority({
+        supabase,
+        organizationId: activeOrgId,
+        priority,
+      });
+      if (policy) {
+        resolvedSlaDueAt = computeResolutionDueAtFromPolicy({
+          createdAt: ticketCreatedAt,
+          policy,
+        });
+      }
+    }
+
     const { data: insertedTicket, error: ticketInsertError } = await supabase
       .from("tickets")
       .insert({
@@ -400,7 +444,8 @@ export async function POST(req: Request) {
         priority,
         assignee_id: assigneeId,
         created_by: userId,
-        sla_due_at: slaDueAt,
+        sla_due_at: resolvedSlaDueAt,
+        created_at: ticketCreatedAt,
       })
       .select(
         "id, organization_id, customer_id, order_id, title, description, status, priority, assignee_id, created_by, sla_due_at, created_at, updated_at, closed_at",
@@ -489,6 +534,13 @@ export async function POST(req: Request) {
         })),
       );
     }
+
+    await runSlaEscalationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      ticketId: insertedTicket.id,
+    });
 
     return NextResponse.json({ ticket }, { status: 201 });
   } catch {

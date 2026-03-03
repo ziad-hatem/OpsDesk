@@ -6,6 +6,7 @@ import { cn } from "@/app/components/ui/utils";
 
 const SETTINGS_ITEMS = [
   { label: "Team", href: "/settings/team" },
+  { label: "SLA", href: "/settings/sla" },
   { label: "Activity", href: "/settings/activity" },
 ];
 

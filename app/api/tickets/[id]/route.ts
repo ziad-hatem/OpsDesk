@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/server/audit-logs";
+import {
+  computeResolutionDueAtFromPolicy,
+  getSlaPolicyByPriority,
+  runSlaEscalationEngine,
+} from "@/lib/server/sla-engine";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
@@ -628,6 +633,24 @@ export async function PATCH(req: Request, context: RouteContext) {
     }
   }
 
+  if (priorityChange && !hasSlaDueAt) {
+    const policy = await getSlaPolicyByPriority({
+      supabase,
+      organizationId: activeOrgId,
+      priority: priorityChange.to as TicketRow["priority"],
+    });
+    if (policy) {
+      const calculatedSlaDueAt = computeResolutionDueAtFromPolicy({
+        createdAt: existingTicket.created_at,
+        policy,
+      });
+      if (calculatedSlaDueAt && calculatedSlaDueAt !== existingTicket.sla_due_at) {
+        updatePayload.sla_due_at = calculatedSlaDueAt;
+        systemMessages.push("SLA due date recalculated from priority policy");
+      }
+    }
+  }
+
   if (Object.keys(updatePayload).length > 0) {
     const ticketTitleForNotifications = updatePayload.title ?? existingTicket.title;
 
@@ -807,6 +830,13 @@ export async function PATCH(req: Request, context: RouteContext) {
         },
       });
     }
+
+    await runSlaEscalationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      ticketId,
+    });
   }
 
   const detailResult = await buildTicketDetailResponse({

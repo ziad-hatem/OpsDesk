@@ -18,6 +18,13 @@ export interface ReportsCustomerGrowthPoint {
   customers: number;
 }
 
+export interface ReportsSlaCompliancePoint {
+  label: string;
+  resolved: number;
+  breaches: number;
+  compliance: number;
+}
+
 export interface ReportsMetricValue {
   current: number | null;
   previous: number | null;
@@ -29,12 +36,14 @@ export interface ReportsMetrics {
   customerSatisfactionScore: ReportsMetricValue;
   firstContactResolutionRate: ReportsMetricValue;
   ticketBacklogCount: ReportsMetricValue;
+  slaComplianceRate: ReportsMetricValue;
 }
 
 export interface ReportsResponse {
   revenueTrend: ReportsRevenuePoint[];
   ticketVolume: ReportsTicketVolumePoint[];
   customerGrowth: ReportsCustomerGrowthPoint[];
+  slaComplianceTrend: ReportsSlaCompliancePoint[];
   metrics: ReportsMetrics;
   activeOrgId: string;
   currentUserId: string;

@@ -5,6 +5,7 @@ export interface DashboardKpis {
   totalRevenueAmount: number;
   openTicketsCount: number;
   slaBreachesCount: number;
+  slaComplianceRate: number;
 }
 
 export interface DashboardChartPoint {
@@ -32,9 +33,17 @@ export interface DashboardHighPriorityTicket {
   created_at: string;
 }
 
+export interface DashboardSlaCompliancePoint {
+  label: string;
+  resolved: number;
+  breaches: number;
+  compliance: number;
+}
+
 export interface DashboardResponse {
   kpis: DashboardKpis;
   chart: DashboardChartPoint[];
+  slaComplianceTrend: DashboardSlaCompliancePoint[];
   recentOrders: DashboardRecentOrder[];
   highPriorityTickets: DashboardHighPriorityTicket[];
   activeOrgId: string;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import { runSlaEscalationEngine } from "@/lib/server/sla-engine";
 import {
   getUniqueRecipientIds,
   insertAppNotifications,
@@ -167,6 +168,13 @@ export async function POST(req: Request, context: RouteContext) {
       })),
     );
   }
+
+  await runSlaEscalationEngine({
+    supabase,
+    organizationId: activeOrgId,
+    actorUserId: userId,
+    ticketId,
+  });
 
   return NextResponse.json({ text }, { status: 201 });
 }

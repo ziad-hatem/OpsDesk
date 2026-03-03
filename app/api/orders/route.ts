@@ -65,6 +65,17 @@ function normalizeIsoDate(value: unknown): string | null {
   return parsed.toISOString();
 }
 
+function normalizeIsoDateQueryParam(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString();
+}
+
 function normalizeNonNegativeInteger(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value)) {
     return null;
@@ -123,6 +134,8 @@ export async function GET(req: Request) {
     const statusFilter = searchParams.get("status");
     const paymentStatusFilter = searchParams.get("paymentStatus");
     const customerIdFilter = searchParams.get("customerId");
+    const createdFrom = normalizeIsoDateQueryParam(searchParams.get("createdFrom"));
+    const createdTo = normalizeIsoDateQueryParam(searchParams.get("createdTo"));
     const search = searchParams.get("search")?.trim() ?? "";
     const limitParam = Number(searchParams.get("limit") ?? "200");
     const limit = Number.isFinite(limitParam)
@@ -152,6 +165,12 @@ export async function GET(req: Request) {
 
     if (customerIdFilter && customerIdFilter !== "all") {
       query = query.eq("customer_id", customerIdFilter);
+    }
+    if (createdFrom) {
+      query = query.gte("created_at", createdFrom);
+    }
+    if (createdTo) {
+      query = query.lte("created_at", createdTo);
     }
 
     if (search.length > 0) {

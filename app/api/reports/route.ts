@@ -34,6 +34,12 @@ type TicketTextRow = {
   created_at: string;
 };
 
+type SlaEventRow = {
+  ticket_id: string;
+  event_type: "resolution_breached";
+  created_at: string;
+};
+
 type CustomerRow = {
   id: string;
   status: CustomerStatus;
@@ -172,6 +178,55 @@ function resolveTicketResolvedAt(ticket: TicketRow): string | null {
     return ticket.updated_at;
   }
   return null;
+}
+
+function computeSlaComplianceForRange(params: {
+  tickets: TicketRow[];
+  slaEvents: SlaEventRow[];
+  from: Date;
+  to: Date;
+}): {
+  resolved: number;
+  breaches: number;
+  compliance: number | null;
+} {
+  const { tickets, slaEvents, from, to } = params;
+  const resolvedTicketIds = new Set<string>();
+
+  for (const ticket of tickets) {
+    const resolvedAt = resolveTicketResolvedAt(ticket);
+    if (!resolvedAt) {
+      continue;
+    }
+    if (!inRange(resolvedAt, from, to)) {
+      continue;
+    }
+    resolvedTicketIds.add(ticket.id);
+  }
+
+  const breachedTicketIds = new Set<string>();
+  for (const event of slaEvents) {
+    if (!inRange(event.created_at, from, to)) {
+      continue;
+    }
+    if (!resolvedTicketIds.has(event.ticket_id)) {
+      continue;
+    }
+    breachedTicketIds.add(event.ticket_id);
+  }
+
+  const resolved = resolvedTicketIds.size;
+  const breaches = breachedTicketIds.size;
+  const compliance =
+    resolved > 0
+      ? roundOne(Math.max(0, ((resolved - breaches) / resolved) * 100))
+      : null;
+
+  return {
+    resolved,
+    breaches,
+    compliance,
+  };
 }
 
 function buildRevenueSeries(params: {
@@ -497,7 +552,7 @@ export async function GET(req: Request) {
   );
   const queryStart = new Date(queryStartTime).toISOString();
 
-  const [ordersResult, ticketsResult, ticketTextsResult, customersResult] =
+  const [ordersResult, ticketsResult, ticketTextsResult, customersResult, ticketSlaEventsResult] =
     await Promise.all([
       supabase
         .from("orders")
@@ -529,6 +584,14 @@ export async function GET(req: Request) {
         .eq("organization_id", activeOrgId)
         .lte("created_at", to.toISOString())
         .returns<CustomerRow[]>(),
+      supabase
+        .from("ticket_sla_events")
+        .select("ticket_id, event_type, created_at")
+        .eq("organization_id", activeOrgId)
+        .eq("event_type", "resolution_breached")
+        .gte("created_at", queryStart)
+        .limit(50000)
+        .returns<SlaEventRow[]>(),
     ]);
 
   if (ordersResult.error) {
@@ -583,10 +646,21 @@ export async function GET(req: Request) {
     );
   }
 
+  if (
+    ticketSlaEventsResult.error &&
+    !isMissingTableInSchemaCache(ticketSlaEventsResult.error, "ticket_sla_events")
+  ) {
+    return NextResponse.json(
+      { error: `Failed to load ticket SLA events for reports: ${ticketSlaEventsResult.error.message}` },
+      { status: 500 },
+    );
+  }
+
   const orders = ordersResult.data ?? [];
   const tickets = ticketsResult.data ?? [];
   const ticketTexts = ticketTextsResult.data ?? [];
   const customers = customersResult.data ?? [];
+  const ticketSlaEvents = ticketSlaEventsResult.data ?? [];
 
   const currentRevenue = buildRevenueSeries({ orders, from, to });
   const previousRevenue = buildRevenueSeries({
@@ -677,6 +751,43 @@ export async function GET(req: Request) {
     to: yearTo,
   });
 
+  const currentSlaCompliance = computeSlaComplianceForRange({
+    tickets,
+    slaEvents: ticketSlaEvents,
+    from,
+    to,
+  });
+  const previousSlaCompliance = computeSlaComplianceForRange({
+    tickets,
+    slaEvents: ticketSlaEvents,
+    from: previousFrom,
+    to: previousTo,
+  });
+  const yearSlaCompliance = computeSlaComplianceForRange({
+    tickets,
+    slaEvents: ticketSlaEvents,
+    from: yearFrom,
+    to: yearTo,
+  });
+
+  const slaComplianceTrend = monthStartsBetween(from, to).map((monthStart) => {
+    const monthStartTime = startOfMonth(monthStart);
+    const monthEndTime = endOfMonth(monthStart);
+    const monthCompliance = computeSlaComplianceForRange({
+      tickets,
+      slaEvents: ticketSlaEvents,
+      from: monthStartTime,
+      to: monthEndTime,
+    });
+
+    return {
+      label: formatMonthLabel(monthStart, from.getFullYear() !== to.getFullYear()),
+      resolved: monthCompliance.resolved,
+      breaches: monthCompliance.breaches,
+      compliance: monthCompliance.compliance ?? 100,
+    };
+  });
+
   const metrics: ReportsMetrics = {
     avgResponseTimeMinutes: {
       current: currentMetrics.avgResponseTimeMinutes,
@@ -698,12 +809,18 @@ export async function GET(req: Request) {
       previous: previousMetrics.ticketBacklogCount,
       year: yearMetrics.ticketBacklogCount,
     },
+    slaComplianceRate: {
+      current: currentSlaCompliance.compliance,
+      previous: previousSlaCompliance.compliance,
+      year: yearSlaCompliance.compliance,
+    },
   };
 
   const response: ReportsResponse = {
     revenueTrend,
     ticketVolume,
     customerGrowth,
+    slaComplianceTrend,
     metrics,
     activeOrgId,
     currentUserId: userId,

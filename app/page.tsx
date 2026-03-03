@@ -22,6 +22,7 @@ import {
   Ticket as TicketIcon,
   CalendarIcon,
   Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -97,6 +98,10 @@ export default function DashboardPage() {
   }, [activeOrgId, loadDashboard]);
 
   const chartData = useMemo(() => dashboard?.chart ?? [], [dashboard?.chart]);
+  const slaComplianceTrend = useMemo(
+    () => dashboard?.slaComplianceTrend ?? [],
+    [dashboard?.slaComplianceTrend],
+  );
   const recentOrders = useMemo(() => dashboard?.recentOrders ?? [], [dashboard?.recentOrders]);
   const highPriorityTickets = useMemo(
     () => dashboard?.highPriorityTickets ?? [],
@@ -143,7 +148,7 @@ export default function DashboardPage() {
         </Popover>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
           title="Total Revenue"
           value={formatMoney(dashboard?.kpis.totalRevenueAmount ?? 0)}
@@ -161,6 +166,12 @@ export default function DashboardPage() {
           value={dashboard?.kpis.slaBreachesCount ?? 0}
           icon={AlertCircle}
           trend="down"
+        />
+        <KPICard
+          title="SLA Compliance"
+          value={`${(dashboard?.kpis.slaComplianceRate ?? 100).toFixed(1)}%`}
+          icon={ShieldCheck}
+          trend="up"
         />
       </div>
 
@@ -209,6 +220,51 @@ export default function DashboardPage() {
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     name="Previous Period"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>SLA Compliance Trend</CardTitle>
+          <CardDescription>Daily resolved tickets vs SLA breaches</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="h-[260px] flex items-center justify-center text-slate-500">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading SLA trend...
+            </div>
+          ) : slaComplianceTrend.length === 0 ? (
+            <div className="h-[260px] flex items-center justify-center text-slate-500">
+              No SLA trend data for this date range.
+            </div>
+          ) : (
+            <div className="h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={slaComplianceTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="label" stroke="#64748b" />
+                  <YAxis stroke="#64748b" domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="compliance"
+                    stroke="#0f172a"
+                    strokeWidth={2}
+                    name="Compliance %"
                   />
                 </LineChart>
               </ResponsiveContainer>

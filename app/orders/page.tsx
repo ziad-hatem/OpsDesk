@@ -37,11 +37,15 @@ import type {
   OrdersListResponse,
   OrderStatus,
 } from "@/lib/orders/types";
+import type { SavedView, SavedViewsResponse } from "@/lib/saved-views/types";
 
 type FilterState = {
   status: "all" | OrderStatus;
   paymentStatus: "all" | OrderPaymentStatus;
   customerId: "all" | string;
+  search: string;
+  createdFrom: string;
+  createdTo: string;
 };
 
 type CreateOrderForm = {
@@ -166,12 +170,33 @@ function canIncludeInCurrentFilter(order: OrderListItem, filters: FilterState) {
   return true;
 }
 
+function parseOrderFiltersFromSavedView(filters: Record<string, unknown>): FilterState {
+  const status = typeof filters.status === "string" ? filters.status : "all";
+  const paymentStatus =
+    typeof filters.paymentStatus === "string" ? filters.paymentStatus : "all";
+  const customerId = typeof filters.customerId === "string" ? filters.customerId : "all";
+  const search = typeof filters.search === "string" ? filters.search : "";
+  const createdFrom = typeof filters.createdFrom === "string" ? filters.createdFrom : "";
+  const createdTo = typeof filters.createdTo === "string" ? filters.createdTo : "";
+
+  return {
+    status: status as FilterState["status"],
+    paymentStatus: paymentStatus as FilterState["paymentStatus"],
+    customerId,
+    search,
+    createdFrom,
+    createdTo,
+  };
+}
+
 export default function OrdersListPage() {
   const router = useRouter();
   const activeOrgId = useAppSelector(selectTopbarActiveOrganizationId);
 
   const [orders, setOrders] = useState<OrderListItem[]>([]);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [selectedViewId, setSelectedViewId] = useState("none");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -184,6 +209,9 @@ export default function OrdersListPage() {
     status: "all",
     paymentStatus: "all",
     customerId: "all",
+    search: "",
+    createdFrom: "",
+    createdTo: "",
   });
 
   const loadOrders = useCallback(async () => {
@@ -198,6 +226,15 @@ export default function OrdersListPage() {
       }
       if (filters.customerId !== "all") {
         params.set("customerId", filters.customerId);
+      }
+      if (filters.search.trim()) {
+        params.set("search", filters.search.trim());
+      }
+      if (filters.createdFrom) {
+        params.set("createdFrom", filters.createdFrom);
+      }
+      if (filters.createdTo) {
+        params.set("createdTo", filters.createdTo);
       }
       params.set("limit", "500");
 
@@ -220,7 +257,14 @@ export default function OrdersListPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [filters.customerId, filters.paymentStatus, filters.status]);
+  }, [
+    filters.createdFrom,
+    filters.createdTo,
+    filters.customerId,
+    filters.paymentStatus,
+    filters.search,
+    filters.status,
+  ]);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -251,6 +295,46 @@ export default function OrdersListPage() {
 
     void Promise.all([loadOrders(), loadCustomers()]);
   }, [activeOrgId, loadCustomers, loadOrders]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSavedViews = async () => {
+      if (!activeOrgId) {
+        if (isMounted) {
+          setSavedViews([]);
+          setSelectedViewId("none");
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/saved-views?entityType=orders", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load saved views");
+        }
+
+        const payload = (await response.json()) as SavedViewsResponse;
+        if (isMounted) {
+          setSavedViews(payload.views ?? []);
+        }
+      } catch {
+        if (isMounted) {
+          setSavedViews([]);
+          setSelectedViewId("none");
+        }
+      }
+    };
+
+    void loadSavedViews();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeOrgId]);
 
   const paidOrdersCount = useMemo(
     () => orders.filter((order) => order.payment_status === "paid").length,
@@ -556,6 +640,73 @@ export default function OrdersListPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleApplySavedView = (viewId: string) => {
+    setSelectedViewId(viewId);
+    if (viewId === "none") {
+      return;
+    }
+    const view = savedViews.find((item) => item.id === viewId);
+    if (!view) {
+      return;
+    }
+    setFilters(parseOrderFiltersFromSavedView(view.filters));
+  };
+
+  const handleSaveCurrentView = async () => {
+    const name = window.prompt("Saved view name");
+    if (!name?.trim()) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/saved-views", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          entityType: "orders",
+          name: name.trim(),
+          filters,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = (await response.json()) as { error?: string };
+        throw new Error(errorData.error ?? "Failed to save view");
+      }
+      const payload = (await response.json()) as { view: SavedView };
+      setSavedViews((prev) => [payload.view, ...prev]);
+      setSelectedViewId(payload.view.id);
+      toast.success("View saved");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to save view";
+      toast.error(message);
+    }
+  };
+
+  const handleDeleteSavedView = async () => {
+    if (selectedViewId === "none") {
+      toast.error("Select a saved view first");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/saved-views/${selectedViewId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const errorData = (await response.json()) as { error?: string };
+        throw new Error(errorData.error ?? "Failed to delete view");
+      }
+      setSavedViews((prev) => prev.filter((view) => view.id !== selectedViewId));
+      setSelectedViewId("none");
+      toast.success("View deleted");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to delete view";
+      toast.error(message);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -582,78 +733,126 @@ export default function OrdersListPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Select
-            value={filters.status}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                status: value as FilterState["status"],
-              }))
-            }
-          >
-            <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-slate-900">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              {ORDER_STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="space-y-3">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Input
+              value={filters.search}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, search: event.target.value }))
+              }
+              placeholder="Search order number or notes..."
+              className="w-full sm:w-[260px] focus:ring-2 focus:ring-slate-900"
+            />
+            <Select
+              value={filters.status}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: value as FilterState["status"],
+                }))
+              }
+            >
+              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {ORDER_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select
-            value={filters.paymentStatus}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                paymentStatus: value as FilterState["paymentStatus"],
-              }))
-            }
-          >
-            <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-slate-900">
-              <SelectValue placeholder="Payment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Payments</SelectItem>
-              {PAYMENT_STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select
+              value={filters.paymentStatus}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  paymentStatus: value as FilterState["paymentStatus"],
+                }))
+              }
+            >
+              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                {PAYMENT_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select
-            value={filters.customerId}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                customerId: value,
-              }))
-            }
-          >
-            <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
-              <SelectValue placeholder="Customer" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Customers</SelectItem>
-              {customers.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {customer.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select
+              value={filters.customerId}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  customerId: value,
+                }))
+              }
+            >
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="date"
+              value={filters.createdFrom}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, createdFrom: event.target.value }))
+              }
+              className="w-[180px] focus:ring-2 focus:ring-slate-900"
+            />
+            <Input
+              type="date"
+              value={filters.createdTo}
+              onChange={(event) =>
+                setFilters((prev) => ({ ...prev, createdTo: event.target.value }))
+              }
+              className="w-[180px] focus:ring-2 focus:ring-slate-900"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={selectedViewId} onValueChange={handleApplySavedView}>
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue placeholder="Saved view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No saved view</SelectItem>
+                {savedViews.map((view) => (
+                  <SelectItem key={view.id} value={view.id}>
+                    {view.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={handleSaveCurrentView}>
+              Save View
+            </Button>
+            <Button variant="outline" onClick={handleDeleteSavedView}>
+              Delete View
+            </Button>
+            <Badge variant="secondary" className="w-fit text-sm">
+              Payments Completed: {paidOrdersCount}
+            </Badge>
+          </div>
         </div>
-
-        <Badge variant="secondary" className="w-fit text-sm">
-          Payments Completed: {paidOrdersCount}
-        </Badge>
       </div>
 
       {isLoading ? (

@@ -184,6 +184,10 @@ export default function ReportsPage() {
   const revenueData = useMemo(() => reports?.revenueTrend ?? [], [reports?.revenueTrend]);
   const ticketVolumeData = useMemo(() => reports?.ticketVolume ?? [], [reports?.ticketVolume]);
   const customerGrowthData = useMemo(() => reports?.customerGrowth ?? [], [reports?.customerGrowth]);
+  const slaComplianceData = useMemo(
+    () => reports?.slaComplianceTrend ?? [],
+    [reports?.slaComplianceTrend],
+  );
 
   const comparisonDataKey = compareWith === "year" ? "year" : "previous";
   const comparisonLabel = compareWith === "year" ? "Last Year" : "Previous Period";
@@ -217,6 +221,12 @@ export default function ReportsPage() {
   const backlogDelta = metrics
     ? getDeltaPercent(metrics.ticketBacklogCount.current, backlogBaseline)
     : null;
+  const slaComplianceBaseline = metrics
+    ? getMetricBaseline(metrics.slaComplianceRate, compareWith)
+    : null;
+  const slaComplianceDelta = metrics
+    ? getDeltaPercent(metrics.slaComplianceRate.current, slaComplianceBaseline)
+    : null;
 
   const handleExportCsv = () => {
     if (!reports) {
@@ -249,6 +259,12 @@ export default function ReportsPage() {
         reports.metrics.ticketBacklogCount.previous?.toFixed(0) ?? "",
         reports.metrics.ticketBacklogCount.year?.toFixed(0) ?? "",
       ],
+      [
+        "SLA Compliance (%)",
+        reports.metrics.slaComplianceRate.current?.toFixed(1) ?? "",
+        reports.metrics.slaComplianceRate.previous?.toFixed(1) ?? "",
+        reports.metrics.slaComplianceRate.year?.toFixed(1) ?? "",
+      ],
     ];
 
     const rows: string[][] = [
@@ -274,6 +290,15 @@ export default function ReportsPage() {
       ...reports.customerGrowth.map((point) => [
         point.month,
         String(point.customers),
+      ]),
+      [""],
+      ["SLA Compliance Trend"],
+      ["Month", "Resolved", "Breaches", "Compliance (%)"],
+      ...reports.slaComplianceTrend.map((point) => [
+        point.label,
+        String(point.resolved),
+        String(point.breaches),
+        point.compliance.toFixed(1),
       ]),
       [""],
       ["Key Metrics"],
@@ -508,7 +533,54 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>SLA Compliance Trend</CardTitle>
+          <CardDescription>
+            Monthly percentage of resolved tickets that met SLA targets
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="h-[300px] flex items-center justify-center text-slate-500">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading SLA trend...
+            </div>
+          ) : slaComplianceData.length === 0 ? (
+            <div className="h-[300px] flex items-center justify-center text-slate-500">
+              No SLA data in this range.
+            </div>
+          ) : (
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={slaComplianceData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="label" stroke="#64748b" />
+                  <YAxis stroke="#64748b" domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="compliance"
+                    stroke="#0f172a"
+                    strokeWidth={2}
+                    name="Compliance %"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-slate-600 mb-1">Avg Response Time</p>
@@ -550,6 +622,17 @@ export default function ReportsPage() {
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(backlogDelta, "lower-better")}`}>
               {formatTrendText(backlogDelta, compareWith)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-slate-600 mb-1">SLA Compliance</p>
+            <p className="text-2xl font-semibold text-slate-900">
+              {formatPercent(metrics?.slaComplianceRate.current ?? null)}
+            </p>
+            <p className={`text-xs mt-1 ${getTrendClass(slaComplianceDelta, "higher-better")}`}>
+              {formatTrendText(slaComplianceDelta, compareWith)}
             </p>
           </CardContent>
         </Card>
