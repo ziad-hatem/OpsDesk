@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { toAuditActionLabel } from "@/lib/audit/format";
 import type { AuditLogItem, AuditLogsResponse, AuditLogUser } from "@/lib/audit/types";
 import { getOrganizationActorContext } from "@/lib/server/organization-context";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import { isMissingTableInSchemaCache } from "@/lib/tickets/errors";
 
 type RouteContext = {
@@ -122,13 +123,30 @@ export async function GET(req: Request, context: RouteContext) {
 
   const {
     supabase,
-    actorMembership: { role: actorRole },
+    userId,
+    actorMembership,
   } = actorContextResult.context;
 
-  if (actorRole !== "admin" && actorRole !== "manager") {
+  const authorizeAudit = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: "action.audit.logs.view",
+    actionLabel: "View activity logs",
+    fallbackAllowed: actorMembership.role === "admin" || actorMembership.role === "manager",
+    useApprovalFlow: false,
+    actorMembership: {
+      id: actorMembership.id,
+      userId,
+      role: actorMembership.role,
+      status: actorMembership.status,
+      customRoleId: actorMembership.custom_role_id ?? null,
+    },
+  });
+  if (!authorizeAudit.ok) {
     return NextResponse.json(
-      { error: "You do not have permission to view activity logs" },
-      { status: 403 },
+      { error: authorizeAudit.error },
+      { status: authorizeAudit.status },
     );
   }
 

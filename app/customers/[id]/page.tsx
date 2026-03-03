@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  AlertTriangle,
   DollarSign,
   Dot,
+  MessageCircle,
   Mail,
   Ticket as TicketIcon,
   Loader2,
@@ -19,7 +21,10 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Badge } from "../../components/ui/badge";
 import { useAppSelector } from "@/lib/store/hooks";
 import { selectTopbarActiveOrganizationId } from "@/lib/store/slices/topbar-slice";
-import type { CustomerDetailResponse } from "@/lib/customers/types";
+import type {
+  CustomerCommunicationItem,
+  CustomerDetailResponse,
+} from "@/lib/customers/types";
 
 function formatDateTime(isoDate: string | null) {
   if (!isoDate) {
@@ -46,6 +51,19 @@ function formatMoney(cents: number, currency: string) {
   } catch {
     return `${(cents / 100).toFixed(2)} ${currency || "USD"}`;
   }
+}
+
+function channelLabel(channel: CustomerCommunicationItem["channel"]) {
+  if (channel === "sms") {
+    return "SMS";
+  }
+  if (channel === "whatsapp") {
+    return "WhatsApp";
+  }
+  if (channel === "chat") {
+    return "Chat";
+  }
+  return "Email";
 }
 
 export default function CustomerDetailPage() {
@@ -94,6 +112,11 @@ export default function CustomerDetailPage() {
   const customer = detail?.customer ?? null;
   const tickets = useMemo(() => detail?.tickets ?? [], [detail?.tickets]);
   const orders = useMemo(() => detail?.orders ?? [], [detail?.orders]);
+  const communications = useMemo(
+    () => detail?.communications ?? [],
+    [detail?.communications],
+  );
+  const incidents = useMemo(() => detail?.incidents ?? [], [detail?.incidents]);
   const activity = useMemo(() => detail?.activity ?? [], [detail?.activity]);
 
   if (isLoading) {
@@ -205,6 +228,7 @@ export default function CustomerDetailPage() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="conversations">Conversations</TabsTrigger>
           <TabsTrigger value="activity">Activity Log</TabsTrigger>
           <TabsTrigger value="tickets">Tickets</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
@@ -252,6 +276,77 @@ export default function CustomerDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Service Incident Context</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {incidents.length === 0 ? (
+                <p className="text-sm text-slate-500">No recent incidents in this organization.</p>
+              ) : (
+                <div className="space-y-3">
+                  {incidents.slice(0, 8).map((incident) => (
+                    <div key={incident.id} className="rounded-lg border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-slate-500" />
+                        <p className="font-medium text-slate-900">{incident.title}</p>
+                        <StatusBadge status={incident.status} />
+                        <StatusBadge status={incident.severity} />
+                      </div>
+                      <p className="mt-2 text-xs text-slate-600">
+                        Started: {formatDateTime(incident.started_at)}
+                        {incident.resolved_at ? ` | Resolved: ${formatDateTime(incident.resolved_at)}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="conversations">
+          <Card>
+            <CardHeader>
+              <CardTitle>Omnichannel Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {communications.length === 0 ? (
+                <p className="text-sm text-slate-500">No communications recorded yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {communications.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <MessageCircle className="h-4 w-4 text-slate-500" />
+                        <Badge variant="outline">{channelLabel(item.channel)}</Badge>
+                        <Badge variant={item.direction === "inbound" ? "secondary" : "default"}>
+                          {item.direction === "inbound" ? "Inbound" : "Outbound"}
+                        </Badge>
+                        {item.subject ? (
+                          <p className="text-sm font-medium text-slate-900">{item.subject}</p>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-800 whitespace-pre-wrap">{item.preview}</p>
+                      <div className="mt-2 flex flex-wrap items-center text-xs text-slate-600 gap-2">
+                        <span>{formatDateTime(item.occurred_at)}</span>
+                        {item.actor ? <span>By {item.actor.name ?? item.actor.email}</span> : null}
+                        {item.sender_email || item.sender_phone ? (
+                          <span>
+                            From {item.sender_email ?? item.sender_phone}
+                          </span>
+                        ) : null}
+                        {item.ticket_id ? <span>Ticket linked</span> : null}
+                        {item.order_id ? <span>Order linked</span> : null}
+                        {item.incident_id ? <span>Incident linked</span> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="activity">
@@ -266,7 +361,20 @@ export default function CustomerDetailPage() {
                 <div className="space-y-4">
                   {activity.map((item) => (
                     <div key={item.id} className="rounded-lg border border-slate-200 p-4">
-                      <p className="font-medium text-slate-900">{item.title}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-slate-900">{item.title}</p>
+                        {item.kind === "communication" && item.channel ? (
+                          <Badge variant="outline">{channelLabel(item.channel)}</Badge>
+                        ) : null}
+                        {item.kind === "communication" && item.direction ? (
+                          <Badge variant={item.direction === "inbound" ? "secondary" : "default"}>
+                            {item.direction === "inbound" ? "Inbound" : "Outbound"}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {item.preview ? (
+                        <p className="mt-2 text-sm text-slate-700">{item.preview}</p>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap items-center text-xs text-slate-600">
                         <span>{formatDateTime(item.occurred_at)}</span>
                         <Dot className="h-4 w-4" />

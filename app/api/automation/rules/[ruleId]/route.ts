@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import {
   normalizeAutomationActions,
   normalizeAutomationConditions,
 } from "@/lib/server/automation-engine";
-import type { AutomationEntityType, AutomationRule } from "@/lib/automation/types";
+import { isAutomationEntityType } from "@/lib/automation/types";
+import type { AutomationRule } from "@/lib/automation/types";
 import type { OrganizationRole } from "@/lib/topbar/types";
 
 type RouteContext = {
@@ -27,10 +29,6 @@ type UpdateAutomationRuleBody = {
   archived?: boolean;
   isEnabled?: boolean;
 };
-
-function isAutomationEntityType(value: unknown): value is AutomationEntityType {
-  return value === "ticket" || value === "order";
-}
 
 function isMissingAutomationRulesTable(error: { message?: string } | null | undefined): boolean {
   const message = (error?.message ?? "").toLowerCase();
@@ -107,10 +105,24 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   const actorRole = await resolveActorRole({ supabase, activeOrgId, userId });
-  if (!actorRole || (actorRole !== "admin" && actorRole !== "manager")) {
+  const authorizeManage = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.automation.rules.manage",
+    actionLabel: "Update automation rule",
+    fallbackAllowed: Boolean(actorRole && (actorRole === "admin" || actorRole === "manager")),
+    useApprovalFlow: true,
+    entityType: "automation_rule",
+  });
+  if (!authorizeManage.ok) {
     return NextResponse.json(
-      { error: "Only admins or managers can update automation rules" },
-      { status: 403 },
+      {
+        error: authorizeManage.error,
+        code: authorizeManage.code,
+        approvalRequestId: authorizeManage.approvalRequestId ?? null,
+      },
+      { status: authorizeManage.status },
     );
   }
 
@@ -194,16 +206,30 @@ export async function DELETE(_req: Request, context: RouteContext) {
   }
 
   const actorRole = await resolveActorRole({ supabase, activeOrgId, userId });
-  if (!actorRole || (actorRole !== "admin" && actorRole !== "manager")) {
-    return NextResponse.json(
-      { error: "Only admins or managers can delete automation rules" },
-      { status: 403 },
-    );
-  }
-
   const ruleId = await resolveRuleId(context);
   if (!ruleId) {
     return NextResponse.json({ error: "ruleId is required" }, { status: 400 });
+  }
+  const authorizeDelete = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.automation.rules.delete",
+    actionLabel: "Delete automation rule",
+    fallbackAllowed: Boolean(actorRole && (actorRole === "admin" || actorRole === "manager")),
+    useApprovalFlow: true,
+    entityType: "automation_rule",
+    entityId: ruleId,
+  });
+  if (!authorizeDelete.ok) {
+    return NextResponse.json(
+      {
+        error: authorizeDelete.error,
+        code: authorizeDelete.code,
+        approvalRequestId: authorizeDelete.approvalRequestId ?? null,
+      },
+      { status: authorizeDelete.status },
+    );
   }
 
   const { error } = await supabase

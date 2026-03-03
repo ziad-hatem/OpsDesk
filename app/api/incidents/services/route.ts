@@ -10,6 +10,7 @@ import {
   normalizeText,
   resolveOrganizationRole,
 } from "@/lib/server/incidents";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type CreateServiceBody = {
@@ -79,10 +80,24 @@ export async function POST(req: Request) {
     organizationId: activeOrgId,
     userId,
   });
-  if (!canManageIncidents(role)) {
+  const authorizeServiceCreate = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.incidents.update",
+    actionLabel: "Create incident service",
+    fallbackAllowed: canManageIncidents(role),
+    useApprovalFlow: true,
+    entityType: "status_service",
+  });
+  if (!authorizeServiceCreate.ok) {
     return NextResponse.json(
-      { error: "Only admin, manager, or support can create services" },
-      { status: 403 },
+      {
+        error: authorizeServiceCreate.error,
+        code: authorizeServiceCreate.code,
+        approvalRequestId: authorizeServiceCreate.approvalRequestId ?? null,
+      },
+      { status: authorizeServiceCreate.status },
     );
   }
 
@@ -170,4 +185,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

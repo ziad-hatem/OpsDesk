@@ -69,6 +69,13 @@ export async function GET(req: Request) {
     const supabase = createSupabaseAdminClient();
     const { searchParams } = new URL(req.url);
     const filter = searchParams.get("filter") === "unread" ? "unread" : "all";
+    const typeFilterRaw = searchParams.get("types");
+    const typeFilter = typeFilterRaw
+      ? typeFilterRaw
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [];
     const limit = Number(searchParams.get("limit") ?? "50");
     const boundedLimit = Number.isFinite(limit)
       ? Math.min(Math.max(limit, 1), 200)
@@ -89,6 +96,9 @@ export async function GET(req: Request) {
     }
     if (filter === "unread") {
       query = query.is("read_at", null);
+    }
+    if (typeFilter.length > 0) {
+      query = query.in("type", typeFilter);
     }
 
     const { data, error } = await query.returns<NotificationRow[]>();
@@ -124,7 +134,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function PATCH() {
+export async function PATCH(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -133,6 +143,18 @@ export async function PATCH() {
   try {
     const supabase = createSupabaseAdminClient();
     const activeOrgId = await resolveActiveOrgId(supabase, session.user.id);
+    let body: { ids?: string[] } = {};
+    try {
+      body = (await req.json()) as {
+        ids?: string[];
+      };
+    } catch {
+      body = {};
+    }
+
+    const requestedIds = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
 
     let updateQuery = supabase
       .from("notifications")
@@ -142,6 +164,9 @@ export async function PATCH() {
 
     if (activeOrgId) {
       updateQuery = updateQuery.eq("organization_id", activeOrgId);
+    }
+    if (requestedIds.length > 0) {
+      updateQuery = updateQuery.in("id", requestedIds);
     }
 
     const { error } = await updateQuery;

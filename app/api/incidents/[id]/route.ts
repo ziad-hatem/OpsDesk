@@ -9,6 +9,11 @@ import {
   recalculateServiceStatuses,
   resolveOrganizationRole,
 } from "@/lib/server/incidents";
+import { authorizeRbacAction } from "@/lib/server/rbac";
+import {
+  runIncidentAutomationEngine,
+  type IncidentAutomationRow,
+} from "@/lib/server/automation-engine";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type RouteContext = {
@@ -25,6 +30,9 @@ type IncidentRow = {
   is_public: boolean;
   started_at: string;
   resolved_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type IncidentImpactRow = {
@@ -75,21 +83,37 @@ export async function PATCH(req: Request, context: RouteContext) {
     organizationId: activeOrgId,
     userId,
   });
-  if (!canManageIncidents(role)) {
-    return NextResponse.json(
-      { error: "Only admin, manager, or support can update incidents" },
-      { status: 403 },
-    );
-  }
-
   const incidentId = await resolveIncidentId(context);
   if (!incidentId) {
     return NextResponse.json({ error: "Incident id is required" }, { status: 400 });
   }
+  const authorizeUpdate = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.incidents.update",
+    actionLabel: "Update incident",
+    fallbackAllowed: canManageIncidents(role),
+    useApprovalFlow: true,
+    entityType: "incident",
+    entityId: incidentId,
+  });
+  if (!authorizeUpdate.ok) {
+    return NextResponse.json(
+      {
+        error: authorizeUpdate.error,
+        code: authorizeUpdate.code,
+        approvalRequestId: authorizeUpdate.approvalRequestId ?? null,
+      },
+      { status: authorizeUpdate.status },
+    );
+  }
 
   const { data: existingIncident, error: incidentError } = await supabase
     .from("incidents")
-    .select("id, organization_id, title, summary, status, severity, is_public, started_at, resolved_at")
+    .select(
+      "id, organization_id, title, summary, status, severity, is_public, started_at, resolved_at, created_by, created_at, updated_at",
+    )
     .eq("organization_id", activeOrgId)
     .eq("id", incidentId)
     .maybeSingle<IncidentRow>();
@@ -347,6 +371,21 @@ export async function PATCH(req: Request, context: RouteContext) {
     });
   }
 
+  const incidentAfterUpdate: IncidentAutomationRow = {
+    ...(existingIncident as IncidentAutomationRow),
+    ...(patch as Partial<IncidentAutomationRow>),
+    updated_at: new Date().toISOString(),
+  };
+
+  await runIncidentAutomationEngine({
+    supabase,
+    organizationId: activeOrgId,
+    actorUserId: userId,
+    triggerEvent: "incident.updated",
+    incidentBefore: existingIncident as IncidentAutomationRow,
+    incidentAfter: incidentAfterUpdate,
+  });
+
   await writeAuditLog({
     supabase,
     organizationId: activeOrgId,
@@ -363,4 +402,3 @@ export async function PATCH(req: Request, context: RouteContext) {
 
   return NextResponse.json({ success: true }, { status: 200 });
 }
-

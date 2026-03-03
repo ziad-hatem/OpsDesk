@@ -1,4 +1,6 @@
 export type ReportsCompareWith = "previous" | "year" | "none";
+export type ReportsScheduleFrequency = "daily" | "weekly" | "monthly";
+export type ReportsScheduleRunStatus = "success" | "failed";
 
 export interface ReportsRevenuePoint {
   label: string;
@@ -33,6 +35,8 @@ export interface ReportsMetricValue {
 
 export interface ReportsMetrics {
   avgResponseTimeMinutes: ReportsMetricValue;
+  avgResolutionTimeMinutes: ReportsMetricValue;
+  incidentMttrMinutes: ReportsMetricValue;
   customerSatisfactionScore: ReportsMetricValue;
   firstContactResolutionRate: ReportsMetricValue;
   ticketBacklogCount: ReportsMetricValue;
@@ -55,4 +59,41 @@ export interface ReportsResponse {
     yearFrom: string;
     yearTo: string;
   };
+}
+
+export interface ReportsScheduleItem {
+  id: string;
+  organization_id: string;
+  name: string;
+  frequency: ReportsScheduleFrequency;
+  compare_with: ReportsCompareWith;
+  range_days: number;
+  timezone: string;
+  recipients: string[];
+  is_enabled: boolean;
+  next_run_at: string;
+  last_run_at: string | null;
+  last_status: ReportsScheduleRunStatus | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportsScheduleRunItem {
+  id: string;
+  organization_id: string;
+  schedule_id: string | null;
+  status: ReportsScheduleRunStatus;
+  recipients: string[];
+  report_from: string;
+  report_to: string;
+  error_message: string | null;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface ReportsSchedulesResponse {
+  activeOrgId: string;
+  schedules: ReportsScheduleItem[];
+  recentRuns: ReportsScheduleRunItem[];
 }

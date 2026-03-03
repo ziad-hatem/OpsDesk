@@ -2,16 +2,13 @@ import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getOrganizationActorContext } from "@/lib/server/organization-context";
 import { writeAuditLog } from "@/lib/server/audit-logs";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import {
   buildInviteLink,
   sendTeamInviteEmail,
 } from "@/lib/server/team-invite-email";
 import { isMissingTeamSchema, missingTeamSchemaMessage } from "@/lib/team/errors";
 import type { TeamInvite } from "@/lib/team/types";
-import {
-  canManageInviteRole,
-  getRolePermissions,
-} from "@/lib/team/validation";
 import type { OrganizationRole } from "@/lib/topbar/types";
 
 type RouteContext = {
@@ -73,14 +70,6 @@ export async function POST(_req: Request, context: RouteContext) {
     actorMembership: { role: actorRole },
   } = actorContextResult.context;
 
-  const rolePermissions = getRolePermissions(actorRole);
-  if (!rolePermissions.canInvite) {
-    return NextResponse.json(
-      { error: "You do not have permission to resend invites" },
-      { status: 403 },
-    );
-  }
-
   const { data: inviteData, error: inviteError } = await supabase
     .from("organization_invites")
     .select("id, email, role, invited_by, expires_at, created_at, accepted_at, revoked_at")
@@ -102,10 +91,57 @@ export async function POST(_req: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invite not found" }, { status: 404 });
   }
 
-  if (!canManageInviteRole(actorRole, inviteData.role)) {
+  const authorizeResend = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: "action.team.invite.resend",
+    actionLabel: "Resend team invite",
+    fallbackAllowed: actorRole === "admin" || actorRole === "manager",
+    useApprovalFlow: true,
+    entityType: "organization_invite",
+    entityId: inviteId,
+    payload: {
+      targetRole: inviteData.role,
+      invitedEmail: inviteData.email,
+    },
+  });
+  if (!authorizeResend.ok) {
     return NextResponse.json(
-      { error: "You do not have permission to resend this invite" },
-      { status: 403 },
+      {
+        error: authorizeResend.error,
+        code: authorizeResend.code,
+        approvalRequestId: authorizeResend.approvalRequestId ?? null,
+      },
+      { status: authorizeResend.status },
+    );
+  }
+
+  const rolePermissionKey =
+    inviteData.role === "admin"
+      ? "field.team.invite.role.admin.assign"
+      : inviteData.role === "manager"
+        ? "field.team.invite.role.manager.assign"
+        : inviteData.role === "support"
+          ? "field.team.invite.role.support.assign"
+          : "field.team.invite.role.read_only.assign";
+  const roleFallbackAllowed =
+    actorRole === "admin" ||
+    (actorRole === "manager" &&
+      (inviteData.role === "support" || inviteData.role === "read_only"));
+  const authorizeRoleTarget = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: rolePermissionKey,
+    actionLabel: `Manage ${inviteData.role} invite`,
+    fallbackAllowed: roleFallbackAllowed,
+    useApprovalFlow: false,
+  });
+  if (!authorizeRoleTarget.ok) {
+    return NextResponse.json(
+      { error: authorizeRoleTarget.error },
+      { status: authorizeRoleTarget.status },
     );
   }
 

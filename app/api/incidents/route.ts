@@ -15,6 +15,11 @@ import {
   recalculateServiceStatuses,
   resolveOrganizationRole,
 } from "@/lib/server/incidents";
+import { authorizeRbacAction } from "@/lib/server/rbac";
+import {
+  runIncidentAutomationEngine,
+  type IncidentAutomationRow,
+} from "@/lib/server/automation-engine";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type CreateIncidentBody = {
@@ -155,10 +160,24 @@ export async function POST(req: Request) {
     organizationId: activeOrgId,
     userId,
   });
-  if (!canManageIncidents(role)) {
+  const authorizeCreate = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.incidents.create",
+    actionLabel: "Create incident",
+    fallbackAllowed: canManageIncidents(role),
+    useApprovalFlow: true,
+    entityType: "incident",
+  });
+  if (!authorizeCreate.ok) {
     return NextResponse.json(
-      { error: "Only admin, manager, or support can create incidents" },
-      { status: 403 },
+      {
+        error: authorizeCreate.error,
+        code: authorizeCreate.code,
+        approvalRequestId: authorizeCreate.approvalRequestId ?? null,
+      },
+      { status: authorizeCreate.status },
     );
   }
 
@@ -326,7 +345,20 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ incident: insertedIncident }, { status: 201 });
+    let incidentAfterAutomation: IncidentRow = insertedIncident;
+    const automationResult = await runIncidentAutomationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      triggerEvent: "incident.created",
+      incidentAfter: insertedIncident as IncidentAutomationRow,
+    });
+    incidentAfterAutomation = {
+      ...incidentAfterAutomation,
+      ...automationResult.incident,
+    };
+
+    return NextResponse.json({ incident: incidentAfterAutomation }, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to create incident";
     if (isMissingIncidentsSchema({ message })) {

@@ -9,6 +9,7 @@ import {
   recalculateServiceStatuses,
   resolveOrganizationRole,
 } from "@/lib/server/incidents";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type RouteContext = {
@@ -50,16 +51,31 @@ export async function POST(req: Request, context: RouteContext) {
     organizationId: activeOrgId,
     userId,
   });
-  if (!canManageIncidents(role)) {
-    return NextResponse.json(
-      { error: "Only admin, manager, or support can post incident updates" },
-      { status: 403 },
-    );
-  }
-
   const incidentId = await resolveIncidentId(context);
   if (!incidentId) {
     return NextResponse.json({ error: "Incident id is required" }, { status: 400 });
+  }
+
+  const authorizeTimeline = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.incidents.timeline.update",
+    actionLabel: "Post incident timeline update",
+    fallbackAllowed: canManageIncidents(role),
+    useApprovalFlow: true,
+    entityType: "incident",
+    entityId: incidentId,
+  });
+  if (!authorizeTimeline.ok) {
+    return NextResponse.json(
+      {
+        error: authorizeTimeline.error,
+        code: authorizeTimeline.code,
+        approvalRequestId: authorizeTimeline.approvalRequestId ?? null,
+      },
+      { status: authorizeTimeline.status },
+    );
   }
 
   let body: CreateIncidentUpdateBody = {};
@@ -190,4 +206,3 @@ export async function POST(req: Request, context: RouteContext) {
 
   return NextResponse.json({ success: true }, { status: 201 });
 }
-

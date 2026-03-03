@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/server/audit-logs";
+import { authorizeRbacAction, loadActorMembership } from "@/lib/server/rbac";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import { sendOrderPaymentLinkEmail } from "@/lib/server/order-payment-email";
 import { getAppBaseUrl, getStripeClient } from "@/lib/server/stripe";
@@ -63,6 +64,49 @@ export async function POST(_req: Request, context: RouteContext) {
   const orderId = await resolveOrderId(context);
   if (!orderId) {
     return NextResponse.json({ error: "Order id is required" }, { status: 400 });
+  }
+
+  const actorMembershipResult = await loadActorMembership({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+  });
+  if (actorMembershipResult.error) {
+    return NextResponse.json(
+      { error: `Failed to verify organization membership: ${actorMembershipResult.error}` },
+      { status: 500 },
+    );
+  }
+  if (!actorMembershipResult.membership || actorMembershipResult.membership.status !== "active") {
+    return NextResponse.json(
+      { error: "You do not have access to this organization" },
+      { status: 403 },
+    );
+  }
+
+  const authorizeBilling = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.billing.order.payment_link.send",
+    actionLabel: "Send order payment link",
+    fallbackAllowed:
+      actorMembershipResult.membership.role === "admin" ||
+      actorMembershipResult.membership.role === "manager",
+    actorMembership: actorMembershipResult.membership,
+    useApprovalFlow: true,
+    entityType: "order",
+    entityId: orderId,
+  });
+  if (!authorizeBilling.ok) {
+    return NextResponse.json(
+      {
+        error: authorizeBilling.error,
+        code: authorizeBilling.code,
+        approvalRequestId: authorizeBilling.approvalRequestId ?? null,
+      },
+      { status: authorizeBilling.status },
+    );
   }
 
   const { data: order, error: orderError } = await supabase

@@ -8,6 +8,7 @@ import {
   isMissingCustomerPortalSchema,
   setCustomerPortalSessionCookie,
 } from "@/lib/server/customer-portal-auth";
+import { runPortalEventAutomationEngine } from "@/lib/server/automation-engine";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type LoginLinkRow = {
@@ -153,6 +154,28 @@ export async function GET(req: Request) {
     );
   }
 
+  await runPortalEventAutomationEngine({
+    supabase,
+    organizationId: loginLink.organization_id,
+    triggerEvent: "portal.auth_verified",
+    portalEvent: {
+      id: sessionTokenHash,
+      organization_id: loginLink.organization_id,
+      event_name: "portal.auth_verified",
+      entity_type: "customer",
+      entity_id: loginLink.customer_id,
+      title: "Customer portal sign-in",
+      status: customer.status,
+      customer_id: loginLink.customer_id,
+      email: loginLink.email,
+      metadata: {
+        sessionExpiresAt,
+      },
+      created_at: nowIso,
+      updated_at: nowIso,
+    },
+  });
+
   const redirectUrl = new URL("/portal", req.url);
   const response = NextResponse.redirect(redirectUrl);
   clearCustomerPortalSessionCookie(response);
@@ -160,4 +183,3 @@ export async function GET(req: Request) {
 
   return response;
 }
-

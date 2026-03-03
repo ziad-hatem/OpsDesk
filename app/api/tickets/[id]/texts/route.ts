@@ -5,6 +5,7 @@ import {
   getUniqueRecipientIds,
   insertAppNotifications,
 } from "@/lib/server/notifications";
+import { insertCustomerCommunicationSafe } from "@/lib/server/communications";
 import { resolveMentionedOrgUserIds } from "@/lib/server/text-mentions";
 import type { TicketTextType, TicketTextWithAttachments, TicketUser } from "@/lib/tickets/types";
 import { isTicketTextType } from "@/lib/tickets/validation";
@@ -26,6 +27,7 @@ type TicketTextRow = Omit<TicketTextWithAttachments, "author" | "attachments">;
 type TicketRecipientsRow = {
   id: string;
   title: string;
+  customer_id: string | null;
   assignee_id: string | null;
   created_by: string;
 };
@@ -94,7 +96,7 @@ export async function POST(req: Request, context: RouteContext) {
 
   const { data: ticketRow, error: ticketAccessError } = await supabase
     .from("tickets")
-    .select("id, title, assignee_id, created_by")
+    .select("id, title, customer_id, assignee_id, created_by")
     .eq("id", ticketId)
     .eq("organization_id", activeOrgId)
     .maybeSingle<TicketRecipientsRow>();
@@ -197,6 +199,26 @@ export async function POST(req: Request, context: RouteContext) {
         entityId: ticketId,
       })),
     );
+  }
+
+  if (type === "comment" && ticketRow.customer_id) {
+    await insertCustomerCommunicationSafe({
+      source: "ticket.text.comment",
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      channel: "chat",
+      direction: "outbound",
+      body: content,
+      subject: `Ticket ${ticketRow.title}`,
+      customerId: ticketRow.customer_id,
+      ticketId,
+      metadata: {
+        ticketTextId: insertedText.id,
+        mentionCount: mentionedUserIds.length,
+      },
+      occurredAt: insertedText.created_at,
+    });
   }
 
   await runSlaEscalationEngine({

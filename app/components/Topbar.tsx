@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import {
+  BarChart3,
   ArrowUpDown,
   Bell,
   ChevronDown,
@@ -11,6 +13,7 @@ import {
   Search,
   ShoppingCart,
   Ticket,
+  TriangleAlert,
   UserRound,
   Users,
 } from "lucide-react";
@@ -84,6 +87,15 @@ type RecentSearchItem = GlobalSearchItem & {
   selectedAt: string;
 };
 
+type QuickAction = {
+  id: string;
+  label: string;
+  subtitle: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  shortcut: string;
+};
+
 function getSearchTypeLabel(type: GlobalSearchItemType): string {
   switch (type) {
     case "ticket":
@@ -96,6 +108,14 @@ function getSearchTypeLabel(type: GlobalSearchItemType): string {
       return "Team";
     default:
       return "Item";
+  }
+}
+
+function getRelativeSearchTime(value: string): string {
+  try {
+    return formatDistanceToNow(new Date(value), { addSuffix: true });
+  } catch {
+    return "recently";
   }
 }
 
@@ -150,16 +170,21 @@ function SearchResultCommandItem({
     <CommandItem
       value={`${item.type}-${item.id}-${item.title}`}
       onSelect={() => onSelect(item)}
-      className="gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
+      className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100">
         <SearchResultIcon type={item.type} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-slate-900">{item.title}</p>
+        <div className="flex items-center gap-2">
+          <p className="truncate font-medium text-slate-900">{item.title}</p>
+          <Badge variant="outline" className="h-5 rounded-full text-[10px]">
+            {shortcutLabel}
+          </Badge>
+        </div>
         <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
       </div>
-      <CommandShortcut>{shortcutLabel}</CommandShortcut>
+      <CommandShortcut>{getRelativeSearchTime(item.createdAt)}</CommandShortcut>
     </CommandItem>
   );
 }
@@ -335,6 +360,52 @@ export function Topbar() {
       teamMembers: searchResults.filter((item) => item.type === "team_member"),
     };
   }, [searchResults]);
+
+  const quickActions = useMemo<QuickAction[]>(
+    () => [
+      {
+        id: "go-tickets",
+        label: "Go to Tickets",
+        subtitle: "Manage queue, filters, and assignments",
+        href: "/tickets",
+        icon: Ticket,
+        shortcut: "G T",
+      },
+      {
+        id: "go-incidents",
+        label: "Go to Incidents",
+        subtitle: "Review status pages and incident timeline",
+        href: "/incidents",
+        icon: TriangleAlert,
+        shortcut: "G I",
+      },
+      {
+        id: "go-orders",
+        label: "Go to Orders",
+        subtitle: "Track order and payment lifecycle",
+        href: "/orders",
+        icon: ShoppingCart,
+        shortcut: "G O",
+      },
+      {
+        id: "go-customers",
+        label: "Go to Customers",
+        subtitle: "Open customer records and health",
+        href: "/customers",
+        icon: UserRound,
+        shortcut: "G C",
+      },
+      {
+        id: "go-reports",
+        label: "Go to Reports",
+        subtitle: "View analytics and compliance trends",
+        href: "/reports",
+        icon: BarChart3,
+        shortcut: "G R",
+      },
+    ],
+    [],
+  );
   const totalSearchResults = searchResults.length;
 
   useEffect(() => {
@@ -388,6 +459,14 @@ export function Topbar() {
       router.push(item.href);
     },
     [persistRecentSearch, router],
+  );
+
+  const handleQuickActionSelect = useCallback(
+    (action: QuickAction) => {
+      setSearchOpen(false);
+      router.push(action.href);
+    },
+    [router],
   );
 
   useEffect(() => {
@@ -651,6 +730,34 @@ export function Topbar() {
                 </div>
               )}
 
+              {showRecents && (
+                <>
+                  <CommandGroup heading="Quick Actions">
+                    {quickActions.map((action) => {
+                      const Icon = action.icon;
+                      return (
+                        <CommandItem
+                          key={action.id}
+                          value={`quick-${action.id}-${action.label}`}
+                          onSelect={() => handleQuickActionSelect(action)}
+                          className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
+                        >
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100">
+                            <Icon className="h-4 w-4 text-slate-600" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-slate-900">{action.label}</p>
+                            <p className="truncate text-xs text-slate-500">{action.subtitle}</p>
+                          </div>
+                          <CommandShortcut>{action.shortcut}</CommandShortcut>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                  <CommandSeparator />
+                </>
+              )}
+
               {showRecents && recentSearches.length > 0 && (
                 <>
                   <CommandGroup heading="Recent">
@@ -659,14 +766,16 @@ export function Topbar() {
                         key={`recent-${item.type}-${item.id}`}
                         value={`recent-${item.type}-${item.id}-${item.title}`}
                         onSelect={() => handleSearchItemSelect(item)}
-                        className="gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
+                        className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
                       >
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100">
                           <Clock3 className="h-4 w-4 text-slate-500" />
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-slate-900">{item.title}</p>
-                          <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
+                          <p className="truncate text-xs text-slate-500">
+                            {item.subtitle} · {getRelativeSearchTime(item.selectedAt)}
+                          </p>
                         </div>
                         <CommandShortcut>{getSearchTypeLabel(item.type)}</CommandShortcut>
                       </CommandItem>
@@ -682,7 +791,10 @@ export function Topbar() {
                 </div>
               )}
 
-              {!canRunSearch && normalizedSearchQuery.length === 0 && recentSearches.length === 0 && (
+              {!canRunSearch &&
+                normalizedSearchQuery.length === 0 &&
+                recentSearches.length === 0 &&
+                quickActions.length === 0 && (
                 <div className="px-3 py-10 text-center text-sm text-slate-500">
                   Search anything in your workspace from one command palette.
                 </div>
@@ -785,7 +897,7 @@ export function Topbar() {
           <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1">
-                <SearchKbd>↑↓</SearchKbd>
+                <SearchKbd>Up/Down</SearchKbd>
                 <ArrowUpDown className="h-3 w-3" />
                 Navigate
               </span>

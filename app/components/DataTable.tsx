@@ -1,24 +1,28 @@
-import { useState } from "react";
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ColumnDef,
+  ColumnFiltersState,
+  SortingState,
   flexRender,
   getCoreRowModel,
-  useReactTable,
-  SortingState,
-  getSortedRowModel,
-  ColumnFiltersState,
   getFilteredRowModel,
   getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from "@tanstack/react-table";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "./ui/table";
+import { ChevronLeft, ChevronRight, ChevronsLeftRight, Settings2 } from "lucide-react";
+import { EmptyState } from "./ui/empty-state";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Input } from "./ui/input";
 import {
   Select,
@@ -28,18 +32,58 @@ import {
   SelectValue,
 } from "./ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, Settings2 } from "lucide-react";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { cn } from "./ui/utils";
+
+type RowDensity = "comfortable" | "compact";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchKey?: string;
   searchPlaceholder?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
+}
+
+function useHorizontalScrollHint(ref: React.RefObject<HTMLDivElement | null>) {
+  const [state, setState] = useState({
+    canScroll: false,
+    atStart: true,
+    atEnd: true,
+  });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+
+    const update = () => {
+      const { scrollWidth, clientWidth, scrollLeft } = element;
+      const canScroll = scrollWidth > clientWidth + 4;
+      const atStart = scrollLeft <= 2;
+      const atEnd = scrollLeft + clientWidth >= scrollWidth - 2;
+      setState({ canScroll, atStart, atEnd });
+    };
+
+    update();
+    element.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+
+    return () => {
+      element.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [ref]);
+
+  return state;
 }
 
 export function DataTable<TData, TValue>({
@@ -47,10 +91,15 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   searchPlaceholder = "Search...",
+  emptyTitle = "No results found",
+  emptyDescription = "Try adjusting your search or filters.",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState({});
+  const [density, setDensity] = useState<RowDensity>("comfortable");
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const scrollHint = useHorizontalScrollHint(tableContainerRef);
 
   const table = useReactTable({
     data,
@@ -62,6 +111,8 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     getPaginationRowModel: getPaginationRowModel(),
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
     state: {
       sorting,
       columnFilters,
@@ -69,77 +120,123 @@ export function DataTable<TData, TValue>({
     },
   });
 
+  const rowCount = table.getFilteredRowModel().rows.length;
+  const cellPaddingClass = density === "compact" ? "py-1.5" : "py-2.5";
+
+  const rightScrollGradientVisible = useMemo(
+    () => scrollHint.canScroll && !scrollHint.atEnd,
+    [scrollHint.atEnd, scrollHint.canScroll],
+  );
+
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        {searchKey && (
-          <Input
-            placeholder={searchPlaceholder}
-            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn(searchKey)?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm focus:ring-2 focus:ring-slate-900"
-          />
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto focus:ring-2 focus:ring-slate-900">
-              <Settings2 className="w-4 h-4 mr-2" />
-              View
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="sticky top-0 z-10 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {searchKey ? (
+            <Input
+              placeholder={searchPlaceholder}
+              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+              onChange={(event) =>
+                table.getColumn(searchKey)?.setFilterValue(event.target.value)
+              }
+              className="max-w-sm focus:ring-2 focus:ring-slate-900"
+            />
+          ) : (
+            <div />
+          )}
+          <div className="flex items-center gap-2">
+            <Select
+              value={density}
+              onValueChange={(value) => setDensity(value as RowDensity)}
+            >
+              <SelectTrigger className="h-9 w-[132px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="comfortable">Comfortable</SelectItem>
+                <SelectItem value="compact">Compact</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="focus:ring-2 focus:ring-slate-900">
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  View
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[220px]">
+                <DropdownMenuLabel>Visible Columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {column.id.replaceAll("_", " ")}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="border border-slate-200 rounded-lg">
-        <Table>
+      <div className="relative rounded-xl border border-slate-200 bg-white">
+        <Table
+          containerRef={tableContainerRef}
+          containerClassName="rounded-xl"
+          className="min-w-[880px] table-fixed"
+        >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
+              <TableRow key={headerGroup.id} className="border-slate-200">
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="relative sticky top-0 z-[1] h-11 bg-slate-100/90 text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur supports-[backdrop-filter]:bg-slate-100/75"
+                    style={{ width: header.getSize() }}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.column.getCanResize() ? (
+                      <div
+                        onDoubleClick={() => header.column.resetSize()}
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={cn(
+                          "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none",
+                          header.column.getIsResizing()
+                            ? "bg-slate-400"
+                            : "bg-transparent hover:bg-slate-300",
+                        )}
+                      />
+                    ) : null}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="transition-all duration-200"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={cn(cellPaddingClass, "text-slate-700")}
+                      style={{ width: cell.column.getSize() }}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -147,31 +244,37 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                <TableCell colSpan={columns.length} className="p-4">
+                  <EmptyState title={emptyTitle} description={emptyDescription} />
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+        {rightScrollGradientVisible ? (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent" />
+        ) : null}
       </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-600">
-          {table.getFilteredRowModel().rows.length} row(s) total
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <ChevronsLeftRight className="h-4 w-4" />
+          {scrollHint.canScroll ? (
+            <span className="md:hidden">Swipe horizontally to see more columns</span>
+          ) : (
+            <span>{rowCount} row(s) total</span>
+          )}
         </div>
-        <div className="flex items-center gap-6">
+
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">Rows per page</span>
             <Select
               value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => {
-                table.setPageSize(Number(value));
-              }}
+              onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[70px] focus:ring-2 focus:ring-slate-900">
-                <SelectValue placeholder={table.getState().pagination.pageSize} />
+              <SelectTrigger className="h-8 w-[76px] focus:ring-2 focus:ring-slate-900">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent side="top">
                 {[10, 20, 30, 40, 50].map((pageSize) => (
@@ -182,31 +285,30 @@ export function DataTable<TData, TValue>({
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600">
               Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+              {Math.max(1, table.getPageCount())}
             </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                className="focus:ring-2 focus:ring-slate-900"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                className="focus:ring-2 focus:ring-slate-900"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="focus:ring-2 focus:ring-slate-900"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="focus:ring-2 focus:ring-slate-900"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>

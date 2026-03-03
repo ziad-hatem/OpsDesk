@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { getOrganizationActorContext } from "@/lib/server/organization-context";
 import { writeAuditLog } from "@/lib/server/audit-logs";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import { isMissingTeamSchema, missingTeamSchemaMessage } from "@/lib/team/errors";
-import {
-  canManageInviteRole,
-  getRolePermissions,
-} from "@/lib/team/validation";
 import type { OrganizationRole } from "@/lib/topbar/types";
 
 type RouteContext = {
@@ -51,13 +48,6 @@ export async function DELETE(_req: Request, context: RouteContext) {
     actorMembership: { role: actorRole },
   } = actorContextResult.context;
 
-  if (!getRolePermissions(actorRole).canInvite) {
-    return NextResponse.json(
-      { error: "You do not have permission to revoke invites" },
-      { status: 403 },
-    );
-  }
-
   const { data: inviteData, error: inviteError } = await supabase
     .from("organization_invites")
     .select("id, email, role, accepted_at, revoked_at")
@@ -79,10 +69,57 @@ export async function DELETE(_req: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invite not found" }, { status: 404 });
   }
 
-  if (!canManageInviteRole(actorRole, inviteData.role)) {
+  const authorizeRevoke = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: "action.team.invite.revoke",
+    actionLabel: "Revoke team invite",
+    fallbackAllowed: actorRole === "admin" || actorRole === "manager",
+    useApprovalFlow: true,
+    entityType: "organization_invite",
+    entityId: inviteId,
+    payload: {
+      targetRole: inviteData.role,
+      invitedEmail: inviteData.email,
+    },
+  });
+  if (!authorizeRevoke.ok) {
     return NextResponse.json(
-      { error: "You do not have permission to revoke this invite" },
-      { status: 403 },
+      {
+        error: authorizeRevoke.error,
+        code: authorizeRevoke.code,
+        approvalRequestId: authorizeRevoke.approvalRequestId ?? null,
+      },
+      { status: authorizeRevoke.status },
+    );
+  }
+
+  const rolePermissionKey =
+    inviteData.role === "admin"
+      ? "field.team.invite.role.admin.assign"
+      : inviteData.role === "manager"
+        ? "field.team.invite.role.manager.assign"
+        : inviteData.role === "support"
+          ? "field.team.invite.role.support.assign"
+          : "field.team.invite.role.read_only.assign";
+  const roleFallbackAllowed =
+    actorRole === "admin" ||
+    (actorRole === "manager" &&
+      (inviteData.role === "support" || inviteData.role === "read_only"));
+  const authorizeRoleTarget = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: rolePermissionKey,
+    actionLabel: `Manage ${inviteData.role} invite`,
+    fallbackAllowed: roleFallbackAllowed,
+    useApprovalFlow: false,
+  });
+  if (!authorizeRoleTarget.ok) {
+    return NextResponse.json(
+      { error: authorizeRoleTarget.error },
+      { status: authorizeRoleTarget.status },
     );
   }
 

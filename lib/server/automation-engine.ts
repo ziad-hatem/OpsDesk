@@ -1,10 +1,14 @@
 import type {
+  AutomationCondition,
   AutomationAction,
   AutomationChangedField,
-  AutomationCondition,
   AutomationEntityType,
   AutomationRule,
   AutomationTriggerEvent,
+} from "@/lib/automation/types";
+import {
+  AUTOMATION_ENTITY_TRIGGER_EVENTS,
+  isAutomationTriggerCompatibleWithEntityType,
 } from "@/lib/automation/types";
 import { isOrganizationRole } from "@/lib/team/validation";
 import { isTicketPriority, isTicketStatus } from "@/lib/tickets/validation";
@@ -12,12 +16,19 @@ import { isMissingTableInSchemaCache } from "@/lib/tickets/errors";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import type { OrganizationRole } from "@/lib/topbar/types";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets/types";
+import { isCustomerStatus } from "@/lib/customers/validation";
+import type { CustomerStatus } from "@/lib/customers/types";
 import {
   derivePaymentStatusFromOrderStatus,
   isOrderPaymentStatus,
   isOrderStatus,
 } from "@/lib/orders/validation";
 import type { OrderPaymentStatus, OrderStatus } from "@/lib/orders/types";
+import {
+  isIncidentSeverity,
+  isIncidentStatus,
+} from "@/lib/incidents/validation";
+import type { IncidentSeverity, IncidentStatus } from "@/lib/incidents/types";
 import { getUniqueRecipientIds, insertAppNotifications } from "@/lib/server/notifications";
 import { writeAuditLog } from "@/lib/server/audit-logs";
 
@@ -62,6 +73,55 @@ export type OrderAutomationRow = {
   updated_at: string;
 };
 
+export type CustomerAutomationRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: CustomerStatus;
+  external_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IncidentAutomationRow = {
+  id: string;
+  organization_id: string;
+  title: string;
+  summary: string | null;
+  status: IncidentStatus;
+  severity: IncidentSeverity;
+  is_public: boolean;
+  started_at: string;
+  resolved_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PortalEventAutomationRow = {
+  id: string;
+  organization_id: string;
+  event_name: Extract<AutomationTriggerEvent, `portal.${string}`>;
+  entity_type?: "ticket" | "order" | "customer" | "incident" | "portal";
+  entity_id?: string | null;
+  title?: string | null;
+  status?: string | null;
+  customer_id?: string | null;
+  email?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type AutomationEntityRow =
+  | TicketAutomationRow
+  | OrderAutomationRow
+  | CustomerAutomationRow
+  | IncidentAutomationRow
+  | PortalEventAutomationRow;
+
 type AutomationRuleRow = Omit<AutomationRule, "conditions" | "actions"> & {
   conditions: unknown;
   actions: unknown;
@@ -75,18 +135,23 @@ type MembershipRow = {
 
 type MembershipFallbackRow = Omit<MembershipRow, "status">;
 
-const AUTOMATION_TRIGGER_EVENTS: AutomationTriggerEvent[] = [
-  "ticket.created",
-  "ticket.updated",
-  "order.created",
-  "order.updated",
-];
+const AUTOMATION_TRIGGER_EVENTS: AutomationTriggerEvent[] = Object.values(
+  AUTOMATION_ENTITY_TRIGGER_EVENTS,
+).flat() as AutomationTriggerEvent[];
 
 const AUTOMATION_CHANGED_FIELDS: AutomationChangedField[] = [
   "status",
   "priority",
   "assignee_id",
   "payment_status",
+  "name",
+  "email",
+  "phone",
+  "external_id",
+  "title",
+  "summary",
+  "severity",
+  "is_public",
 ];
 
 const DEFAULT_TICKET_AUTOMATION_RULES: Array<{
@@ -154,11 +219,109 @@ const DEFAULT_ORDER_AUTOMATION_RULES: Array<{
   },
 ];
 
+const DEFAULT_CUSTOMER_AUTOMATION_RULES: Array<{
+  name: string;
+  description: string;
+  entity_type: AutomationEntityType;
+  trigger_event: AutomationTriggerEvent;
+  conditions: AutomationCondition;
+  actions: AutomationAction[];
+}> = [
+  {
+    name: "Blocked Customer Escalation",
+    description:
+      "When a customer becomes blocked, notify managers for follow-up.",
+    entity_type: "customer",
+    trigger_event: "customer.updated",
+    conditions: {
+      statuses: ["blocked"],
+    },
+    actions: [
+      {
+        type: "notify_role",
+        role: "manager",
+        title: "Customer blocked",
+        body: 'Customer "{{title}}" is now blocked.',
+      },
+    ],
+  },
+];
+
+const DEFAULT_INCIDENT_AUTOMATION_RULES: Array<{
+  name: string;
+  description: string;
+  entity_type: AutomationEntityType;
+  trigger_event: AutomationTriggerEvent;
+  conditions: AutomationCondition;
+  actions: AutomationAction[];
+}> = [
+  {
+    name: "Critical Incident Alert",
+    description:
+      "Notify support and managers when a critical incident is created.",
+    entity_type: "incident",
+    trigger_event: "incident.created",
+    conditions: {
+      severities: ["critical"],
+    },
+    actions: [
+      {
+        type: "notify_role",
+        role: "support",
+        title: "Critical incident declared",
+        body: '"{{title}}" requires immediate attention.',
+      },
+      {
+        type: "notify_role",
+        role: "manager",
+        title: "Critical incident declared",
+        body: '"{{title}}" requires immediate attention.',
+      },
+    ],
+  },
+];
+
+const DEFAULT_PORTAL_AUTOMATION_RULES: Array<{
+  name: string;
+  description: string;
+  entity_type: AutomationEntityType;
+  trigger_event: AutomationTriggerEvent;
+  conditions: AutomationCondition;
+  actions: AutomationAction[];
+}> = [
+  {
+    name: "Portal Ticket Reply Alert",
+    description:
+      "Notify support whenever a customer replies from the portal.",
+    entity_type: "portal",
+    trigger_event: "portal.ticket_replied",
+    conditions: {},
+    actions: [
+      {
+        type: "notify_role",
+        role: "support",
+        title: "Portal ticket reply",
+        body: 'Customer replied on "{{title}}".',
+      },
+    ],
+  },
+];
+
 function getDefaultRulesByEntityType(entityType: AutomationEntityType) {
-  if (entityType === "order") {
-    return DEFAULT_ORDER_AUTOMATION_RULES;
+  switch (entityType) {
+    case "ticket":
+      return DEFAULT_TICKET_AUTOMATION_RULES;
+    case "order":
+      return DEFAULT_ORDER_AUTOMATION_RULES;
+    case "customer":
+      return DEFAULT_CUSTOMER_AUTOMATION_RULES;
+    case "incident":
+      return DEFAULT_INCIDENT_AUTOMATION_RULES;
+    case "portal":
+      return DEFAULT_PORTAL_AUTOMATION_RULES;
+    default:
+      return DEFAULT_TICKET_AUTOMATION_RULES;
   }
-  return DEFAULT_TICKET_AUTOMATION_RULES;
 }
 
 function isMissingAutomationRulesTable(error: { message?: string } | null | undefined): boolean {
@@ -215,14 +378,23 @@ export function normalizeAutomationConditions(value: unknown): AutomationConditi
 
   const statuses = Array.isArray(raw.statuses)
     ? raw.statuses.filter(
-        (entry): entry is TicketStatus | OrderStatus =>
-          isTicketStatus(entry) || isOrderStatus(entry),
+        (entry): entry is TicketStatus | OrderStatus | CustomerStatus | IncidentStatus =>
+          isTicketStatus(entry) ||
+          isOrderStatus(entry) ||
+          isCustomerStatus(entry) ||
+          isIncidentStatus(entry),
       )
     : [];
 
   const paymentStatuses = Array.isArray(raw.paymentStatuses)
     ? raw.paymentStatuses.filter((entry): entry is OrderPaymentStatus =>
         isOrderPaymentStatus(entry),
+      )
+    : [];
+
+  const severities = Array.isArray(raw.severities)
+    ? raw.severities.filter((entry): entry is IncidentSeverity =>
+        isIncidentSeverity(entry),
       )
     : [];
 
@@ -248,6 +420,9 @@ export function normalizeAutomationConditions(value: unknown): AutomationConditi
   }
   if (paymentStatuses.length > 0) {
     result.paymentStatuses = Array.from(new Set(paymentStatuses));
+  }
+  if (severities.length > 0) {
+    result.severities = Array.from(new Set(severities));
   }
   if (changedFields.length > 0) {
     result.changedFields = Array.from(new Set(changedFields));
@@ -301,11 +476,18 @@ export function normalizeAutomationActions(value: unknown): AutomationAction[] {
     if (
       type === "set_status" &&
       typeof raw.status === "string" &&
-      (isTicketStatus(raw.status) || isOrderStatus(raw.status))
+      (isTicketStatus(raw.status) ||
+        isOrderStatus(raw.status) ||
+        isCustomerStatus(raw.status) ||
+        isIncidentStatus(raw.status))
     ) {
       actions.push({
         type,
-        status: raw.status as TicketStatus | OrderStatus,
+        status: raw.status as
+          | TicketStatus
+          | OrderStatus
+          | CustomerStatus
+          | IncidentStatus,
       });
       continue;
     }
@@ -331,6 +513,18 @@ export function normalizeAutomationActions(value: unknown): AutomationAction[] {
         type,
         paymentStatus: raw.paymentStatus,
       });
+      continue;
+    }
+
+    if (
+      type === "set_severity" &&
+      typeof raw.severity === "string" &&
+      isIncidentSeverity(raw.severity)
+    ) {
+      actions.push({
+        type,
+        severity: raw.severity,
+      });
     }
   }
 
@@ -349,25 +543,72 @@ function renderTemplate(
   input: string,
   params: {
     entityType: AutomationEntityType;
-    row: TicketAutomationRow | OrderAutomationRow;
+    row: AutomationEntityRow;
     rule: AutomationRule;
   },
 ): string {
   const { entityType, row, rule } = params;
-  const ticketRow = row as TicketAutomationRow;
-  const orderRow = row as OrderAutomationRow;
-  const title = entityType === "ticket" ? ticketRow.title : orderRow.order_number;
-  const status = row.status;
-  const priority = entityType === "ticket" ? ticketRow.priority : "";
-  const paymentStatus = entityType === "order" ? orderRow.payment_status : "";
-  const assigneeId = entityType === "ticket" ? (ticketRow.assignee_id ?? "unassigned") : "";
+  let title = "";
+  let status = "";
+  let priority = "";
+  let paymentStatus = "";
+  let assigneeId = "";
+  let severity = "";
+  let email = "";
+  let customerId = "";
+  let entityId = row.id;
+  let incidentId = "";
+  let eventName = "";
+
+  if (entityType === "ticket") {
+    const ticketRow = row as TicketAutomationRow;
+    title = ticketRow.title;
+    status = ticketRow.status;
+    priority = ticketRow.priority;
+    assigneeId = ticketRow.assignee_id ?? "unassigned";
+    customerId = ticketRow.customer_id ?? "";
+  } else if (entityType === "order") {
+    const orderRow = row as OrderAutomationRow;
+    title = orderRow.order_number;
+    status = orderRow.status;
+    paymentStatus = orderRow.payment_status;
+    customerId = orderRow.customer_id;
+  } else if (entityType === "customer") {
+    const customerRow = row as CustomerAutomationRow;
+    title = customerRow.name;
+    status = customerRow.status;
+    email = customerRow.email ?? "";
+    customerId = customerRow.id;
+  } else if (entityType === "incident") {
+    const incidentRow = row as IncidentAutomationRow;
+    title = incidentRow.title;
+    status = incidentRow.status;
+    severity = incidentRow.severity;
+    incidentId = incidentRow.id;
+  } else {
+    const portalRow = row as PortalEventAutomationRow;
+    title = portalRow.title ?? portalRow.event_name;
+    status = portalRow.status ?? "";
+    email = portalRow.email ?? "";
+    customerId = portalRow.customer_id ?? "";
+    entityId = portalRow.entity_id ?? portalRow.id;
+    eventName = portalRow.event_name;
+  }
+
   return input
-    .replaceAll("{{ticketId}}", row.id)
-    .replaceAll("{{orderId}}", row.id)
+    .replaceAll("{{ticketId}}", entityType === "ticket" ? row.id : entityId)
+    .replaceAll("{{orderId}}", entityType === "order" ? row.id : entityId)
+    .replaceAll("{{customerId}}", customerId)
+    .replaceAll("{{incidentId}}", incidentId || entityId)
+    .replaceAll("{{entityId}}", entityId)
+    .replaceAll("{{entityType}}", entityType)
+    .replaceAll("{{eventName}}", eventName)
+    .replaceAll("{{email}}", email)
     .replaceAll("{{title}}", title)
     .replaceAll("{{status}}", status)
     .replaceAll("{{priority}}", priority)
     .replaceAll("{{paymentStatus}}", paymentStatus)
+    .replaceAll("{{severity}}", severity)
     .replaceAll("{{assigneeId}}", assigneeId)
     .replaceAll("{{ruleName}}", rule.name);
 }
@@ -574,6 +815,9 @@ function matchesRuleCondition(params: {
   }
 
   if (conditions.paymentStatuses && conditions.paymentStatuses.length > 0) {
+    return false;
+  }
+  if (conditions.severities && conditions.severities.length > 0) {
     return false;
   }
 
@@ -985,6 +1229,9 @@ function matchesOrderRuleCondition(params: {
   if (conditions.priorities && conditions.priorities.length > 0) {
     return false;
   }
+  if (conditions.severities && conditions.severities.length > 0) {
+    return false;
+  }
 
   if (conditions.assigneeState && conditions.assigneeState !== "any") {
     return false;
@@ -1335,6 +1582,1087 @@ export async function runOrderAutomationEngine(params: {
 
   return {
     order: workingOrder,
+    scanned: rules.length,
+    matched,
+    executed,
+    failed,
+  };
+}
+
+function matchesCustomerRuleCondition(params: {
+  rule: AutomationRule;
+  triggerEvent: "customer.created" | "customer.updated";
+  customerBefore: CustomerAutomationRow | null;
+  customerAfter: CustomerAutomationRow;
+  changedFields: Set<AutomationChangedField>;
+}): boolean {
+  const { rule, triggerEvent, customerBefore, customerAfter, changedFields } = params;
+  const conditions = rule.conditions;
+
+  if (
+    conditions.statuses &&
+    conditions.statuses.length > 0 &&
+    !conditions.statuses.includes(customerAfter.status)
+  ) {
+    return false;
+  }
+
+  if (conditions.priorities && conditions.priorities.length > 0) {
+    return false;
+  }
+  if (conditions.paymentStatuses && conditions.paymentStatuses.length > 0) {
+    return false;
+  }
+  if (conditions.severities && conditions.severities.length > 0) {
+    return false;
+  }
+  if (conditions.assigneeState && conditions.assigneeState !== "any") {
+    return false;
+  }
+
+  if (
+    triggerEvent === "customer.updated" &&
+    conditions.changedFields &&
+    conditions.changedFields.length > 0
+  ) {
+    const hasMatchedChangedField = conditions.changedFields.some((field) =>
+      changedFields.has(field),
+    );
+    if (!hasMatchedChangedField) {
+      return false;
+    }
+  }
+
+  if (!customerBefore && triggerEvent === "customer.updated") {
+    return false;
+  }
+
+  return true;
+}
+
+function computeCustomerChangedFields(
+  customerBefore: CustomerAutomationRow | null,
+  customerAfter: CustomerAutomationRow,
+): Set<AutomationChangedField> {
+  const changedFields = new Set<AutomationChangedField>();
+  if (!customerBefore) {
+    return changedFields;
+  }
+
+  if (customerBefore.name !== customerAfter.name) {
+    changedFields.add("name");
+  }
+  if ((customerBefore.email ?? "") !== (customerAfter.email ?? "")) {
+    changedFields.add("email");
+  }
+  if ((customerBefore.phone ?? "") !== (customerAfter.phone ?? "")) {
+    changedFields.add("phone");
+  }
+  if (customerBefore.status !== customerAfter.status) {
+    changedFields.add("status");
+  }
+  if ((customerBefore.external_id ?? "") !== (customerAfter.external_id ?? "")) {
+    changedFields.add("external_id");
+  }
+
+  return changedFields;
+}
+
+async function applyCustomerRule(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId: string | null;
+  rule: AutomationRule;
+  triggerEvent: "customer.created" | "customer.updated";
+  customer: CustomerAutomationRow;
+}): Promise<{
+  customer: CustomerAutomationRow;
+  executedActions: Array<Record<string, unknown>>;
+}> {
+  const { supabase, organizationId, actorUserId, rule, triggerEvent } = params;
+  let workingCustomer = { ...params.customer };
+  const customerPatch: Partial<CustomerAutomationRow> = {};
+  const executedActions: Array<Record<string, unknown>> = [];
+
+  for (const action of rule.actions) {
+    if (action.type === "set_status") {
+      if (!isCustomerStatus(action.status)) {
+        continue;
+      }
+      if (workingCustomer.status === action.status) {
+        continue;
+      }
+      customerPatch.status = action.status;
+      workingCustomer.status = action.status;
+      executedActions.push({
+        type: action.type,
+        status: action.status,
+      });
+      continue;
+    }
+
+    if (action.type === "notify_role") {
+      const roleMembers = await loadRoleMemberIds({
+        supabase,
+        organizationId,
+        role: action.role,
+      });
+      const recipients = getUniqueRecipientIds(roleMembers, actorUserId ?? "__system__");
+      if (!recipients.length) {
+        continue;
+      }
+
+      const titleTemplate = action.title?.trim() || `Automation: ${rule.name}`;
+      const bodyTemplate =
+        action.body?.trim() ||
+        `Customer "{{title}}" matched automation rule "{{ruleName}}" on ${triggerEvent}.`;
+
+      const title = renderTemplate(titleTemplate, {
+        entityType: "customer",
+        row: workingCustomer,
+        rule,
+      });
+      const body = renderTemplate(bodyTemplate, {
+        entityType: "customer",
+        row: workingCustomer,
+        rule,
+      });
+
+      await insertAppNotifications(
+        supabase,
+        recipients.map((recipientId) => ({
+          userId: recipientId,
+          organizationId,
+          type: "alert",
+          title,
+          body,
+          entityType: "customer",
+          entityId: workingCustomer.id,
+        })),
+      );
+
+      executedActions.push({
+        type: action.type,
+        role: action.role,
+        recipients: recipients.length,
+      });
+      continue;
+    }
+
+    if (action.type === "add_comment") {
+      const message = renderTemplate(action.message, {
+        entityType: "customer",
+        row: workingCustomer,
+        rule,
+      }).trim();
+      if (!message) {
+        continue;
+      }
+
+      await writeAuditLog({
+        supabase,
+        organizationId,
+        actorUserId,
+        action: "automation.customer.note",
+        entityType: "customer",
+        entityId: workingCustomer.id,
+        details: {
+          message,
+          triggerEvent,
+          ruleId: rule.id,
+          ruleName: rule.name,
+        },
+      });
+
+      executedActions.push({
+        type: action.type,
+        message,
+      });
+    }
+  }
+
+  if (Object.keys(customerPatch).length > 0) {
+    const { data: updatedCustomer, error: updateError } = await supabase
+      .from("customers")
+      .update(customerPatch)
+      .eq("organization_id", organizationId)
+      .eq("id", workingCustomer.id)
+      .select("id, organization_id, name, email, phone, status, external_id, created_at, updated_at")
+      .maybeSingle<CustomerAutomationRow>();
+
+    if (updateError) {
+      if (isMissingTableInSchemaCache(updateError, "customers")) {
+        throw new Error("Automation engine cannot update customer because table public.customers is missing");
+      }
+      throw new Error(`Failed to update customer from automation rule: ${updateError.message}`);
+    }
+
+    if (updatedCustomer) {
+      workingCustomer = updatedCustomer;
+    }
+  }
+
+  return {
+    customer: workingCustomer,
+    executedActions,
+  };
+}
+
+export async function runCustomerAutomationEngine(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId?: string | null;
+  triggerEvent: "customer.created" | "customer.updated";
+  customerBefore?: CustomerAutomationRow | null;
+  customerAfter: CustomerAutomationRow;
+}): Promise<{
+  customer: CustomerAutomationRow;
+  scanned: number;
+  matched: number;
+  executed: number;
+  failed: number;
+}> {
+  const {
+    supabase,
+    organizationId,
+    actorUserId = null,
+    triggerEvent,
+    customerBefore = null,
+    customerAfter,
+  } = params;
+
+  if (!isAutomationTriggerCompatibleWithEntityType("customer", triggerEvent)) {
+    return {
+      customer: customerAfter,
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  const rules = await getAutomationRules(
+    supabase,
+    organizationId,
+    "customer",
+    actorUserId,
+  );
+  if (!rules.length) {
+    return {
+      customer: customerAfter,
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  const changedFields = computeCustomerChangedFields(customerBefore, customerAfter);
+  let workingCustomer = { ...customerAfter };
+  let matched = 0;
+  let executed = 0;
+  let failed = 0;
+
+  for (const rule of rules) {
+    if (!rule.is_enabled || rule.entity_type !== "customer" || rule.trigger_event !== triggerEvent) {
+      continue;
+    }
+
+    const isMatch = matchesCustomerRuleCondition({
+      rule,
+      triggerEvent,
+      customerBefore,
+      customerAfter: workingCustomer,
+      changedFields,
+    });
+    if (!isMatch) {
+      continue;
+    }
+
+    matched += 1;
+
+    try {
+      const result = await applyCustomerRule({
+        supabase,
+        organizationId,
+        actorUserId,
+        rule,
+        triggerEvent,
+        customer: workingCustomer,
+      });
+
+      workingCustomer = result.customer;
+      const executedActions = result.executedActions;
+      if (executedActions.length === 0) {
+        await insertRuleRun({
+          supabase,
+          organizationId,
+          ruleId: rule.id,
+          entityType: "customer",
+          entityId: workingCustomer.id,
+          triggerEvent,
+          status: "skipped",
+          details: {
+            reason: "matched_without_effect",
+          },
+        });
+        continue;
+      }
+
+      executed += 1;
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "customer",
+        entityId: workingCustomer.id,
+        triggerEvent,
+        status: "executed",
+        details: {
+          actions: executedActions,
+        },
+      });
+
+      await writeAuditLog({
+        supabase,
+        organizationId,
+        actorUserId,
+        action: "automation.rule.executed",
+        entityType: "customer",
+        entityId: workingCustomer.id,
+        details: {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          triggerEvent,
+          actions: executedActions,
+        },
+      });
+    } catch (error: unknown) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : "Unknown automation error";
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "customer",
+        entityId: workingCustomer.id,
+        triggerEvent,
+        status: "failed",
+        details: {
+          error: message,
+        },
+      });
+
+      console.error(`Automation rule failed (${rule.name}): ${message}`);
+    }
+  }
+
+  return {
+    customer: workingCustomer,
+    scanned: rules.length,
+    matched,
+    executed,
+    failed,
+  };
+}
+
+function matchesIncidentRuleCondition(params: {
+  rule: AutomationRule;
+  triggerEvent: "incident.created" | "incident.updated";
+  incidentBefore: IncidentAutomationRow | null;
+  incidentAfter: IncidentAutomationRow;
+  changedFields: Set<AutomationChangedField>;
+}): boolean {
+  const { rule, triggerEvent, incidentBefore, incidentAfter, changedFields } = params;
+  const conditions = rule.conditions;
+
+  if (
+    conditions.statuses &&
+    conditions.statuses.length > 0 &&
+    !conditions.statuses.includes(incidentAfter.status)
+  ) {
+    return false;
+  }
+
+  if (
+    conditions.severities &&
+    conditions.severities.length > 0 &&
+    !conditions.severities.includes(incidentAfter.severity)
+  ) {
+    return false;
+  }
+
+  if (conditions.priorities && conditions.priorities.length > 0) {
+    return false;
+  }
+  if (conditions.paymentStatuses && conditions.paymentStatuses.length > 0) {
+    return false;
+  }
+  if (conditions.assigneeState && conditions.assigneeState !== "any") {
+    return false;
+  }
+
+  if (
+    triggerEvent === "incident.updated" &&
+    conditions.changedFields &&
+    conditions.changedFields.length > 0
+  ) {
+    const hasMatchedChangedField = conditions.changedFields.some((field) =>
+      changedFields.has(field),
+    );
+    if (!hasMatchedChangedField) {
+      return false;
+    }
+  }
+
+  if (!incidentBefore && triggerEvent === "incident.updated") {
+    return false;
+  }
+
+  return true;
+}
+
+function computeIncidentChangedFields(
+  incidentBefore: IncidentAutomationRow | null,
+  incidentAfter: IncidentAutomationRow,
+): Set<AutomationChangedField> {
+  const changedFields = new Set<AutomationChangedField>();
+  if (!incidentBefore) {
+    return changedFields;
+  }
+
+  if (incidentBefore.title !== incidentAfter.title) {
+    changedFields.add("title");
+  }
+  if ((incidentBefore.summary ?? "") !== (incidentAfter.summary ?? "")) {
+    changedFields.add("summary");
+  }
+  if (incidentBefore.status !== incidentAfter.status) {
+    changedFields.add("status");
+  }
+  if (incidentBefore.severity !== incidentAfter.severity) {
+    changedFields.add("severity");
+  }
+  if (incidentBefore.is_public !== incidentAfter.is_public) {
+    changedFields.add("is_public");
+  }
+
+  return changedFields;
+}
+
+async function applyIncidentRule(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId: string | null;
+  rule: AutomationRule;
+  triggerEvent: "incident.created" | "incident.updated";
+  incident: IncidentAutomationRow;
+}): Promise<{
+  incident: IncidentAutomationRow;
+  executedActions: Array<Record<string, unknown>>;
+}> {
+  const { supabase, organizationId, actorUserId, rule, triggerEvent } = params;
+  let workingIncident = { ...params.incident };
+  const incidentPatch: Partial<IncidentAutomationRow> = {};
+  const executedActions: Array<Record<string, unknown>> = [];
+
+  for (const action of rule.actions) {
+    if (action.type === "set_status") {
+      if (!isIncidentStatus(action.status)) {
+        continue;
+      }
+      if (workingIncident.status === action.status) {
+        continue;
+      }
+      incidentPatch.status = action.status;
+      incidentPatch.resolved_at = action.status === "resolved" ? new Date().toISOString() : null;
+      workingIncident.status = action.status;
+      workingIncident.resolved_at = incidentPatch.resolved_at;
+      executedActions.push({
+        type: action.type,
+        status: action.status,
+      });
+      continue;
+    }
+
+    if (action.type === "set_severity") {
+      if (workingIncident.severity === action.severity) {
+        continue;
+      }
+      incidentPatch.severity = action.severity;
+      workingIncident.severity = action.severity;
+      executedActions.push({
+        type: action.type,
+        severity: action.severity,
+      });
+      continue;
+    }
+
+    if (action.type === "notify_role") {
+      const roleMembers = await loadRoleMemberIds({
+        supabase,
+        organizationId,
+        role: action.role,
+      });
+      const recipients = getUniqueRecipientIds(roleMembers, actorUserId ?? "__system__");
+      if (!recipients.length) {
+        continue;
+      }
+
+      const titleTemplate = action.title?.trim() || `Automation: ${rule.name}`;
+      const bodyTemplate =
+        action.body?.trim() ||
+        `Incident "{{title}}" matched automation rule "{{ruleName}}" on ${triggerEvent}.`;
+
+      const title = renderTemplate(titleTemplate, {
+        entityType: "incident",
+        row: workingIncident,
+        rule,
+      });
+      const body = renderTemplate(bodyTemplate, {
+        entityType: "incident",
+        row: workingIncident,
+        rule,
+      });
+
+      await insertAppNotifications(
+        supabase,
+        recipients.map((recipientId) => ({
+          userId: recipientId,
+          organizationId,
+          type: "alert",
+          title,
+          body,
+          entityType: "incident",
+          entityId: workingIncident.id,
+        })),
+      );
+
+      executedActions.push({
+        type: action.type,
+        role: action.role,
+        recipients: recipients.length,
+      });
+      continue;
+    }
+
+    if (action.type === "add_comment") {
+      const message = renderTemplate(action.message, {
+        entityType: "incident",
+        row: workingIncident,
+        rule,
+      }).trim();
+      if (!message) {
+        continue;
+      }
+
+      const { error } = await supabase.from("incident_updates").insert({
+        organization_id: organizationId,
+        incident_id: workingIncident.id,
+        message,
+        status: null,
+        is_public: false,
+        created_by: actorUserId,
+      });
+
+      if (error && !isMissingTableInSchemaCache(error, "incident_updates")) {
+        throw new Error(`Failed to append incident automation update: ${error.message}`);
+      }
+
+      if (!error) {
+        executedActions.push({
+          type: action.type,
+          message,
+        });
+      }
+    }
+  }
+
+  if (Object.keys(incidentPatch).length > 0) {
+    const { data: updatedIncident, error: updateError } = await supabase
+      .from("incidents")
+      .update(incidentPatch)
+      .eq("organization_id", organizationId)
+      .eq("id", workingIncident.id)
+      .select(
+        "id, organization_id, title, summary, status, severity, is_public, started_at, resolved_at, created_by, created_at, updated_at",
+      )
+      .maybeSingle<IncidentAutomationRow>();
+
+    if (updateError) {
+      if (isMissingTableInSchemaCache(updateError, "incidents")) {
+        throw new Error("Automation engine cannot update incident because table public.incidents is missing");
+      }
+      throw new Error(`Failed to update incident from automation rule: ${updateError.message}`);
+    }
+
+    if (updatedIncident) {
+      workingIncident = updatedIncident;
+    }
+  }
+
+  return {
+    incident: workingIncident,
+    executedActions,
+  };
+}
+
+export async function runIncidentAutomationEngine(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId?: string | null;
+  triggerEvent: "incident.created" | "incident.updated";
+  incidentBefore?: IncidentAutomationRow | null;
+  incidentAfter: IncidentAutomationRow;
+}): Promise<{
+  incident: IncidentAutomationRow;
+  scanned: number;
+  matched: number;
+  executed: number;
+  failed: number;
+}> {
+  const {
+    supabase,
+    organizationId,
+    actorUserId = null,
+    triggerEvent,
+    incidentBefore = null,
+    incidentAfter,
+  } = params;
+
+  if (!isAutomationTriggerCompatibleWithEntityType("incident", triggerEvent)) {
+    return {
+      incident: incidentAfter,
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  const rules = await getAutomationRules(
+    supabase,
+    organizationId,
+    "incident",
+    actorUserId,
+  );
+  if (!rules.length) {
+    return {
+      incident: incidentAfter,
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  const changedFields = computeIncidentChangedFields(incidentBefore, incidentAfter);
+  let workingIncident = { ...incidentAfter };
+  let matched = 0;
+  let executed = 0;
+  let failed = 0;
+
+  for (const rule of rules) {
+    if (!rule.is_enabled || rule.entity_type !== "incident" || rule.trigger_event !== triggerEvent) {
+      continue;
+    }
+
+    const isMatch = matchesIncidentRuleCondition({
+      rule,
+      triggerEvent,
+      incidentBefore,
+      incidentAfter: workingIncident,
+      changedFields,
+    });
+    if (!isMatch) {
+      continue;
+    }
+
+    matched += 1;
+
+    try {
+      const result = await applyIncidentRule({
+        supabase,
+        organizationId,
+        actorUserId,
+        rule,
+        triggerEvent,
+        incident: workingIncident,
+      });
+
+      workingIncident = result.incident;
+      const executedActions = result.executedActions;
+      if (executedActions.length === 0) {
+        await insertRuleRun({
+          supabase,
+          organizationId,
+          ruleId: rule.id,
+          entityType: "incident",
+          entityId: workingIncident.id,
+          triggerEvent,
+          status: "skipped",
+          details: {
+            reason: "matched_without_effect",
+          },
+        });
+        continue;
+      }
+
+      executed += 1;
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "incident",
+        entityId: workingIncident.id,
+        triggerEvent,
+        status: "executed",
+        details: {
+          actions: executedActions,
+        },
+      });
+
+      await writeAuditLog({
+        supabase,
+        organizationId,
+        actorUserId,
+        action: "automation.rule.executed",
+        entityType: "incident",
+        entityId: workingIncident.id,
+        details: {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          triggerEvent,
+          actions: executedActions,
+        },
+      });
+    } catch (error: unknown) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : "Unknown automation error";
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "incident",
+        entityId: workingIncident.id,
+        triggerEvent,
+        status: "failed",
+        details: {
+          error: message,
+        },
+      });
+
+      console.error(`Automation rule failed (${rule.name}): ${message}`);
+    }
+  }
+
+  return {
+    incident: workingIncident,
+    scanned: rules.length,
+    matched,
+    executed,
+    failed,
+  };
+}
+
+function normalizePortalRuleEntityType(
+  value: string | undefined | null,
+): "ticket" | "order" | "customer" | "incident" | "portal" {
+  if (
+    value === "ticket" ||
+    value === "order" ||
+    value === "customer" ||
+    value === "incident" ||
+    value === "portal"
+  ) {
+    return value;
+  }
+  return "portal";
+}
+
+function matchesPortalRuleCondition(params: {
+  rule: AutomationRule;
+  event: PortalEventAutomationRow;
+}): boolean {
+  const { rule, event } = params;
+  const conditions = rule.conditions;
+
+  if (conditions.priorities && conditions.priorities.length > 0) {
+    return false;
+  }
+  if (conditions.paymentStatuses && conditions.paymentStatuses.length > 0) {
+    return false;
+  }
+  if (conditions.severities && conditions.severities.length > 0) {
+    return false;
+  }
+  if (conditions.assigneeState && conditions.assigneeState !== "any") {
+    return false;
+  }
+  if (conditions.changedFields && conditions.changedFields.length > 0) {
+    return false;
+  }
+
+  if (conditions.statuses && conditions.statuses.length > 0) {
+    if (!event.status) {
+      return false;
+    }
+    if (!conditions.statuses.includes(event.status as never)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function applyPortalRule(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId: string | null;
+  rule: AutomationRule;
+  triggerEvent: Extract<AutomationTriggerEvent, `portal.${string}`>;
+  event: PortalEventAutomationRow;
+}): Promise<{
+  executedActions: Array<Record<string, unknown>>;
+}> {
+  const { supabase, organizationId, actorUserId, rule, triggerEvent, event } = params;
+  const executedActions: Array<Record<string, unknown>> = [];
+  const normalizedEntityType = normalizePortalRuleEntityType(event.entity_type);
+  const normalizedEntityId = event.entity_id ?? event.id;
+
+  for (const action of rule.actions) {
+    if (action.type === "notify_role") {
+      const roleMembers = await loadRoleMemberIds({
+        supabase,
+        organizationId,
+        role: action.role,
+      });
+      const recipients = getUniqueRecipientIds(roleMembers, actorUserId ?? "__system__");
+      if (!recipients.length) {
+        continue;
+      }
+
+      const titleTemplate = action.title?.trim() || `Automation: ${rule.name}`;
+      const bodyTemplate =
+        action.body?.trim() ||
+        `Portal event "{{eventName}}" matched automation rule "{{ruleName}}".`;
+
+      const title = renderTemplate(titleTemplate, {
+        entityType: "portal",
+        row: event,
+        rule,
+      });
+      const body = renderTemplate(bodyTemplate, {
+        entityType: "portal",
+        row: event,
+        rule,
+      });
+
+      await insertAppNotifications(
+        supabase,
+        recipients.map((recipientId) => ({
+          userId: recipientId,
+          organizationId,
+          type: "alert",
+          title,
+          body,
+          entityType: normalizedEntityType,
+          entityId: normalizedEntityId,
+        })),
+      );
+
+      executedActions.push({
+        type: action.type,
+        role: action.role,
+        recipients: recipients.length,
+      });
+      continue;
+    }
+
+    if (action.type === "add_comment") {
+      const message = renderTemplate(action.message, {
+        entityType: "portal",
+        row: event,
+        rule,
+      }).trim();
+      if (!message) {
+        continue;
+      }
+
+      await writeAuditLog({
+        supabase,
+        organizationId,
+        actorUserId,
+        action: "automation.portal.note",
+        entityType: normalizedEntityType,
+        entityId: normalizedEntityId,
+        details: {
+          message,
+          triggerEvent,
+          ruleId: rule.id,
+          ruleName: rule.name,
+          eventName: event.event_name,
+        },
+      });
+
+      executedActions.push({
+        type: action.type,
+        message,
+      });
+    }
+  }
+
+  return { executedActions };
+}
+
+export async function runPortalEventAutomationEngine(params: {
+  supabase: SupabaseClient;
+  organizationId: string;
+  actorUserId?: string | null;
+  triggerEvent: Extract<AutomationTriggerEvent, `portal.${string}`>;
+  portalEvent: PortalEventAutomationRow;
+}): Promise<{
+  scanned: number;
+  matched: number;
+  executed: number;
+  failed: number;
+}> {
+  const {
+    supabase,
+    organizationId,
+    actorUserId = null,
+    triggerEvent,
+    portalEvent,
+  } = params;
+
+  if (!isAutomationTriggerCompatibleWithEntityType("portal", triggerEvent)) {
+    return {
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  const rules = await getAutomationRules(
+    supabase,
+    organizationId,
+    "portal",
+    actorUserId,
+  );
+  if (!rules.length) {
+    return {
+      scanned: 0,
+      matched: 0,
+      executed: 0,
+      failed: 0,
+    };
+  }
+
+  let matched = 0;
+  let executed = 0;
+  let failed = 0;
+  const normalizedEntityId = portalEvent.entity_id ?? portalEvent.id;
+
+  for (const rule of rules) {
+    if (!rule.is_enabled || rule.entity_type !== "portal" || rule.trigger_event !== triggerEvent) {
+      continue;
+    }
+
+    const isMatch = matchesPortalRuleCondition({
+      rule,
+      event: portalEvent,
+    });
+    if (!isMatch) {
+      continue;
+    }
+
+    matched += 1;
+
+    try {
+      const result = await applyPortalRule({
+        supabase,
+        organizationId,
+        actorUserId,
+        rule,
+        triggerEvent,
+        event: portalEvent,
+      });
+      const executedActions = result.executedActions;
+      if (executedActions.length === 0) {
+        await insertRuleRun({
+          supabase,
+          organizationId,
+          ruleId: rule.id,
+          entityType: "portal",
+          entityId: normalizedEntityId,
+          triggerEvent,
+          status: "skipped",
+          details: {
+            reason: "matched_without_effect",
+          },
+        });
+        continue;
+      }
+
+      executed += 1;
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "portal",
+        entityId: normalizedEntityId,
+        triggerEvent,
+        status: "executed",
+        details: {
+          actions: executedActions,
+          eventName: portalEvent.event_name,
+        },
+      });
+
+      await writeAuditLog({
+        supabase,
+        organizationId,
+        actorUserId,
+        action: "automation.rule.executed",
+        entityType: "portal",
+        entityId: normalizedEntityId,
+        details: {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          triggerEvent,
+          actions: executedActions,
+          eventName: portalEvent.event_name,
+        },
+      });
+    } catch (error: unknown) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : "Unknown automation error";
+
+      await insertRuleRun({
+        supabase,
+        organizationId,
+        ruleId: rule.id,
+        entityType: "portal",
+        entityId: normalizedEntityId,
+        triggerEvent,
+        status: "failed",
+        details: {
+          error: message,
+          eventName: portalEvent.event_name,
+        },
+      });
+
+      console.error(`Automation rule failed (${rule.name}): ${message}`);
+    }
+  }
+
+  return {
     scanned: rules.length,
     matched,
     executed,

@@ -6,11 +6,24 @@ create extension if not exists pgcrypto;
 create table if not exists public.automation_rules (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
-  entity_type text not null check (entity_type in ('ticket', 'order')),
+  entity_type text not null check (entity_type in ('ticket', 'order', 'customer', 'incident', 'portal')),
   name varchar(100) not null,
   description text null,
   trigger_event text not null check (
-    trigger_event in ('ticket.created', 'ticket.updated', 'order.created', 'order.updated')
+    trigger_event in (
+      'ticket.created',
+      'ticket.updated',
+      'order.created',
+      'order.updated',
+      'customer.created',
+      'customer.updated',
+      'incident.created',
+      'incident.updated',
+      'portal.auth_link_requested',
+      'portal.auth_verified',
+      'portal.ticket_replied',
+      'portal.order_payment_started'
+    )
   ),
   conditions jsonb not null default '{}'::jsonb,
   actions jsonb not null default '[]'::jsonb,
@@ -26,10 +39,23 @@ create table if not exists public.automation_rule_runs (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   rule_id uuid null references public.automation_rules(id) on delete set null,
-  entity_type text not null check (entity_type in ('ticket', 'order')),
+  entity_type text not null check (entity_type in ('ticket', 'order', 'customer', 'incident', 'portal')),
   entity_id text not null,
   trigger_event text not null check (
-    trigger_event in ('ticket.created', 'ticket.updated', 'order.created', 'order.updated')
+    trigger_event in (
+      'ticket.created',
+      'ticket.updated',
+      'order.created',
+      'order.updated',
+      'customer.created',
+      'customer.updated',
+      'incident.created',
+      'incident.updated',
+      'portal.auth_link_requested',
+      'portal.auth_verified',
+      'portal.ticket_replied',
+      'portal.order_payment_started'
+    )
   ),
   status text not null check (status in ('executed', 'skipped', 'failed')),
   details jsonb null,
@@ -50,7 +76,7 @@ begin
     begin
       alter table public.automation_rules
         add constraint automation_rules_entity_type_check
-        check (entity_type in ('ticket', 'order'));
+        check (entity_type in ('ticket', 'order', 'customer', 'incident', 'portal'));
     exception
       when duplicate_object then null;
     end;
@@ -58,7 +84,22 @@ begin
     begin
       alter table public.automation_rules
         add constraint automation_rules_trigger_event_check
-        check (trigger_event in ('ticket.created', 'ticket.updated', 'order.created', 'order.updated'));
+        check (
+          trigger_event in (
+            'ticket.created',
+            'ticket.updated',
+            'order.created',
+            'order.updated',
+            'customer.created',
+            'customer.updated',
+            'incident.created',
+            'incident.updated',
+            'portal.auth_link_requested',
+            'portal.auth_verified',
+            'portal.ticket_replied',
+            'portal.order_payment_started'
+          )
+        );
     exception
       when duplicate_object then null;
     end;
@@ -73,7 +114,7 @@ begin
     begin
       alter table public.automation_rule_runs
         add constraint automation_rule_runs_entity_type_check
-        check (entity_type in ('ticket', 'order'));
+        check (entity_type in ('ticket', 'order', 'customer', 'incident', 'portal'));
     exception
       when duplicate_object then null;
     end;
@@ -81,7 +122,22 @@ begin
     begin
       alter table public.automation_rule_runs
         add constraint automation_rule_runs_trigger_event_check
-        check (trigger_event in ('ticket.created', 'ticket.updated', 'order.created', 'order.updated'));
+        check (
+          trigger_event in (
+            'ticket.created',
+            'ticket.updated',
+            'order.created',
+            'order.updated',
+            'customer.created',
+            'customer.updated',
+            'incident.created',
+            'incident.updated',
+            'portal.auth_link_requested',
+            'portal.auth_verified',
+            'portal.ticket_replied',
+            'portal.order_payment_started'
+          )
+        );
     exception
       when duplicate_object then null;
     end;

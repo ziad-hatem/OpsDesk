@@ -5,6 +5,8 @@ import {
   getCustomerPortalContext,
   isMissingCustomerPortalSchema,
 } from "@/lib/server/customer-portal-auth";
+import { insertCustomerCommunicationSafe } from "@/lib/server/communications";
+import { runPortalEventAutomationEngine } from "@/lib/server/automation-engine";
 import { getUniqueRecipientIds, insertAppNotifications } from "@/lib/server/notifications";
 import { resolveMentionedOrgUserIds } from "@/lib/server/text-mentions";
 import type { TicketTextWithAttachments, TicketUser } from "@/lib/tickets/types";
@@ -204,6 +206,48 @@ export async function POST(req: Request, context: RouteContext) {
       })),
     );
   }
+
+  await insertCustomerCommunicationSafe({
+    source: "portal.ticket.reply",
+    supabase,
+    organizationId,
+    actorUserId: authorId,
+    channel: "chat",
+    direction: "inbound",
+    body: content,
+    subject: `Portal reply on ${ticket.title}`,
+    customerId,
+    customerEmail: portalContext.email,
+    ticketId,
+    metadata: {
+      ticketTextId: insertedText.id,
+      mentionCount: mentionedUserIds.length,
+    },
+    occurredAt: insertedText.created_at,
+  });
+
+  await runPortalEventAutomationEngine({
+    supabase,
+    organizationId,
+    actorUserId: authorId,
+    triggerEvent: "portal.ticket_replied",
+    portalEvent: {
+      id: insertedText.id,
+      organization_id: organizationId,
+      event_name: "portal.ticket_replied",
+      entity_type: "ticket",
+      entity_id: ticketId,
+      title: ticket.title,
+      customer_id: customerId,
+      email: portalContext.email,
+      metadata: {
+        ticketTextId: insertedText.id,
+        mentionCount: mentionedUserIds.length,
+      },
+      created_at: insertedText.created_at,
+      updated_at: insertedText.updated_at ?? insertedText.created_at,
+    },
+  });
 
   const text: TicketTextWithAttachments = {
     ...insertedText,

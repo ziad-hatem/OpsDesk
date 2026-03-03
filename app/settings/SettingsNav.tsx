@@ -6,6 +6,7 @@ import { cn } from "@/app/components/ui/utils";
 
 const SETTINGS_ITEMS = [
   { label: "Team", href: "/settings/team" },
+  { label: "Roles", href: "/settings/roles" },
   { label: "SLA", href: "/settings/sla" },
   { label: "Automation", href: "/settings/automation" },
   { label: "Activity", href: "/settings/activity" },

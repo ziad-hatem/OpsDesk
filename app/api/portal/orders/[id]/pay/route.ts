@@ -5,6 +5,7 @@ import {
   ensureCustomerPortalIdentityUser,
   getCustomerPortalContext,
 } from "@/lib/server/customer-portal-auth";
+import { runPortalEventAutomationEngine } from "@/lib/server/automation-engine";
 import { getAppBaseUrl, getStripeClient } from "@/lib/server/stripe";
 import { isMissingTableInSchemaCache, missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
@@ -215,6 +216,32 @@ export async function POST(_req: Request, context: RouteContext) {
     },
   });
 
+  await runPortalEventAutomationEngine({
+    supabase,
+    organizationId,
+    actorUserId,
+    triggerEvent: "portal.order_payment_started",
+    portalEvent: {
+      id: sessionId,
+      organization_id: organizationId,
+      event_name: "portal.order_payment_started",
+      entity_type: "order",
+      entity_id: order.id,
+      title: order.order_number,
+      status: order.status,
+      customer_id: customerId,
+      email: portalContext.email,
+      metadata: {
+        paymentStatus: order.payment_status,
+        checkoutSessionId: sessionId,
+        paymentIntentId,
+        expiresAt: expiresAtIso,
+      },
+      created_at: nowIso,
+      updated_at: nowIso,
+    },
+  });
+
   return NextResponse.json(
     {
       checkoutUrl: sessionUrl,
@@ -224,4 +251,3 @@ export async function POST(_req: Request, context: RouteContext) {
     { status: 200 },
   );
 }
-

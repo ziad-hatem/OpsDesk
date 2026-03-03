@@ -5,6 +5,10 @@ import type {
   CustomersListResponse,
 } from "@/lib/customers/types";
 import { isCustomerStatus, normalizeCustomerStatus } from "@/lib/customers/validation";
+import {
+  runCustomerAutomationEngine,
+  type CustomerAutomationRow,
+} from "@/lib/server/automation-engine";
 import { isMissingTableInSchemaCache, missingTableMessageWithMigration } from "@/lib/tickets/errors";
 import type { TicketStatus } from "@/lib/tickets/types";
 import type { OrderStatus } from "@/lib/orders/types";
@@ -233,7 +237,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: ctxResult.error }, { status: ctxResult.status });
   }
 
-  const { supabase, activeOrgId } = ctxResult.context;
+  const { supabase, activeOrgId, userId } = ctxResult.context;
   if (!activeOrgId) {
     return NextResponse.json(
       { error: "No active organization selected. Create or join an organization first." },
@@ -279,8 +283,17 @@ export async function POST(req: Request) {
       );
     }
 
+    const automationResult = await runCustomerAutomationEngine({
+      supabase,
+      organizationId: activeOrgId,
+      actorUserId: userId,
+      triggerEvent: "customer.created",
+      customerAfter: insertedCustomer as CustomerAutomationRow,
+    });
+
     const customer: CustomerListItem = {
       ...insertedCustomer,
+      ...automationResult.customer,
       open_tickets_count: 0,
       total_tickets_count: 0,
       total_orders_count: 0,

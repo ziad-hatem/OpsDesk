@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import {
   getAutomationRules,
   isAutomationTriggerEvent,
   normalizeAutomationActions,
   normalizeAutomationConditions,
 } from "@/lib/server/automation-engine";
+import {
+  isAutomationEntityType,
+  isAutomationTriggerCompatibleWithEntityType,
+} from "@/lib/automation/types";
 import type {
-  AutomationEntityType,
   AutomationRulesResponse,
 } from "@/lib/automation/types";
 import type { OrganizationRole } from "@/lib/topbar/types";
@@ -36,20 +40,6 @@ type UpsertRulesBody = {
 type ExistingRuleIdRow = {
   id: string;
 };
-
-function isAutomationEntityType(value: unknown): value is AutomationEntityType {
-  return value === "ticket" || value === "order";
-}
-
-function isTriggerCompatibleWithEntityType(
-  entityType: AutomationEntityType,
-  triggerEvent: string,
-): boolean {
-  if (entityType === "ticket") {
-    return triggerEvent === "ticket.created" || triggerEvent === "ticket.updated";
-  }
-  return triggerEvent === "order.created" || triggerEvent === "order.updated";
-}
 
 function normalizeName(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -169,10 +159,24 @@ export async function PATCH(req: Request) {
   }
 
   const actorRole = await resolveActorRole({ supabase, activeOrgId, userId });
-  if (!actorRole || (actorRole !== "admin" && actorRole !== "manager")) {
+  const authorizeManage = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.automation.rules.manage",
+    actionLabel: "Update automation rules",
+    fallbackAllowed: Boolean(actorRole && (actorRole === "admin" || actorRole === "manager")),
+    useApprovalFlow: true,
+    entityType: "automation_rule",
+  });
+  if (!authorizeManage.ok) {
     return NextResponse.json(
-      { error: "Only admins or managers can update automation rules" },
-      { status: 403 },
+      {
+        error: authorizeManage.error,
+        code: authorizeManage.code,
+        approvalRequestId: authorizeManage.approvalRequestId ?? null,
+      },
+      { status: authorizeManage.status },
     );
   }
 
@@ -239,7 +243,7 @@ export async function PATCH(req: Request) {
         { status: 400 },
       );
     }
-    if (!isTriggerCompatibleWithEntityType(entityType, entry.triggerEvent)) {
+    if (!isAutomationTriggerCompatibleWithEntityType(entityType, entry.triggerEvent)) {
       return NextResponse.json(
         {
           error: `triggerEvent "${entry.triggerEvent}" is not valid for entity type "${entityType}"`,

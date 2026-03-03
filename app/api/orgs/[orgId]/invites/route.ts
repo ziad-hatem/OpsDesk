@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getOrganizationActorContext } from "@/lib/server/organization-context";
 import { writeAuditLog } from "@/lib/server/audit-logs";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import {
   buildInviteLink,
   sendTeamInviteEmail,
@@ -9,8 +10,6 @@ import {
 import { isMissingTeamSchema, missingTeamSchemaMessage } from "@/lib/team/errors";
 import type { TeamInvite } from "@/lib/team/types";
 import {
-  canManageInviteRole,
-  getRolePermissions,
   isOrganizationRole,
   normalizeEmail,
 } from "@/lib/team/validation";
@@ -65,14 +64,6 @@ export async function POST(req: Request, context: RouteContext) {
     actorMembership: { role: actorRole },
   } = actorContextResult.context;
 
-  const rolePermissions = getRolePermissions(actorRole);
-  if (!rolePermissions.canInvite) {
-    return NextResponse.json(
-      { error: "You do not have permission to invite members" },
-      { status: 403 },
-    );
-  }
-
   let body: InviteBody;
   try {
     body = (await req.json()) as InviteBody;
@@ -90,10 +81,53 @@ export async function POST(req: Request, context: RouteContext) {
   }
   const role = body.role;
 
-  if (!canManageInviteRole(actorRole, role)) {
+  const authorizeInvite = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: "action.team.invite.create",
+    actionLabel: "Create team invite",
+    fallbackAllowed: actorRole === "admin" || actorRole === "manager",
+    useApprovalFlow: true,
+    entityType: "organization_invite",
+    entityId: email,
+    payload: { invitedRole: role },
+  });
+  if (!authorizeInvite.ok) {
     return NextResponse.json(
-      { error: "You do not have permission to invite this role" },
-      { status: 403 },
+      {
+        error: authorizeInvite.error,
+        code: authorizeInvite.code,
+        approvalRequestId: authorizeInvite.approvalRequestId ?? null,
+      },
+      { status: authorizeInvite.status },
+    );
+  }
+
+  const rolePermissionKey =
+    role === "admin"
+      ? "field.team.invite.role.admin.assign"
+      : role === "manager"
+        ? "field.team.invite.role.manager.assign"
+        : role === "support"
+          ? "field.team.invite.role.support.assign"
+          : "field.team.invite.role.read_only.assign";
+  const roleFallbackAllowed =
+    actorRole === "admin" ||
+    (actorRole === "manager" && (role === "support" || role === "read_only"));
+  const authorizeRoleAssignment = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: rolePermissionKey,
+    actionLabel: `Assign ${role} role in invite`,
+    fallbackAllowed: roleFallbackAllowed,
+    useApprovalFlow: false,
+  });
+  if (!authorizeRoleAssignment.ok) {
+    return NextResponse.json(
+      { error: authorizeRoleAssignment.error },
+      { status: authorizeRoleAssignment.status },
     );
   }
 

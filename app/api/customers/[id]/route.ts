@@ -2,14 +2,24 @@ import { NextResponse } from "next/server";
 import { getTicketRequestContext } from "@/lib/server/ticket-context";
 import type {
   CustomerActivityItem,
+  CustomerCommunicationItem,
   CustomerOrderListItem,
   CustomerDetailResponse,
+  CustomerIncidentSummary,
   CustomerListItem,
   CustomerStatus,
 } from "@/lib/customers/types";
 import { isCustomerStatus } from "@/lib/customers/validation";
 import type { TicketListItem, TicketUser } from "@/lib/tickets/types";
 import type { OrderStatus } from "@/lib/orders/types";
+import {
+  runCustomerAutomationEngine,
+  type CustomerAutomationRow,
+} from "@/lib/server/automation-engine";
+import {
+  formatCommunicationPreview,
+  isMissingCommunicationsSchema,
+} from "@/lib/server/communications";
 import { isMissingTableInSchemaCache, missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type CustomerRow = Omit<
@@ -34,6 +44,38 @@ type AuditLogRow = {
   action: string;
   actor_user_id: string | null;
   created_at: string;
+};
+type CommunicationRow = {
+  id: string;
+  customer_id: string;
+  channel: "email" | "chat" | "whatsapp" | "sms";
+  direction: "inbound" | "outbound";
+  subject: string | null;
+  body: string;
+  provider: string | null;
+  provider_message_id: string | null;
+  sender_name: string | null;
+  sender_email: string | null;
+  sender_phone: string | null;
+  recipient_name: string | null;
+  recipient_email: string | null;
+  recipient_phone: string | null;
+  actor_user_id: string | null;
+  ticket_id: string | null;
+  order_id: string | null;
+  incident_id: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+type IncidentSummaryRow = {
+  id: string;
+  title: string;
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  severity: "critical" | "high" | "medium" | "low";
+  is_public: boolean;
+  started_at: string;
+  resolved_at: string | null;
+  created_by: string | null;
 };
 
 type RouteContext = {
@@ -119,6 +161,32 @@ function toAuditTitle(action: string): string {
     .trim()
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function toChannelLabel(channel: CommunicationRow["channel"]): string {
+  if (channel === "sms") {
+    return "SMS";
+  }
+  if (channel === "whatsapp") {
+    return "WhatsApp";
+  }
+  if (channel === "chat") {
+    return "Chat";
+  }
+  return "Email";
+}
+
+function toCommunicationActivityTitle(communication: {
+  channel: CommunicationRow["channel"];
+  direction: CommunicationRow["direction"];
+  subject: string | null;
+}): string {
+  const channelLabel = toChannelLabel(communication.channel);
+  const directionLabel = communication.direction === "inbound" ? "received" : "sent";
+  if (communication.subject) {
+    return `${channelLabel} ${directionLabel}: ${communication.subject}`;
+  }
+  return `${channelLabel} ${directionLabel}`;
 }
 
 async function resolveCustomerId(context: RouteContext) {
@@ -271,12 +339,57 @@ export async function GET(_req: Request, context: RouteContext) {
     auditLogs = auditLogsData ?? [];
   }
 
+  let communicationRows: CommunicationRow[] = [];
+  {
+    const { data: communicationsData, error: communicationsError } = await supabase
+      .from("customer_communications")
+      .select(
+        "id, customer_id, channel, direction, subject, body, provider, provider_message_id, sender_name, sender_email, sender_phone, recipient_name, recipient_email, recipient_phone, actor_user_id, ticket_id, order_id, incident_id, occurred_at, created_at",
+      )
+      .eq("organization_id", activeOrgId)
+      .eq("customer_id", customerId)
+      .order("occurred_at", { ascending: false })
+      .limit(250)
+      .returns<CommunicationRow[]>();
+
+    if (communicationsError && !isMissingCommunicationsSchema(communicationsError)) {
+      return NextResponse.json(
+        { error: `Failed to load customer communications: ${communicationsError.message}` },
+        { status: 500 },
+      );
+    }
+
+    communicationRows = communicationsData ?? [];
+  }
+
+  let incidentRows: IncidentSummaryRow[] = [];
+  {
+    const { data: incidentsData, error: incidentsError } = await supabase
+      .from("incidents")
+      .select("id, title, status, severity, is_public, started_at, resolved_at, created_by")
+      .eq("organization_id", activeOrgId)
+      .order("started_at", { ascending: false })
+      .limit(20)
+      .returns<IncidentSummaryRow[]>();
+
+    if (incidentsError && !isMissingTableInSchemaCache(incidentsError, "incidents")) {
+      return NextResponse.json(
+        { error: `Failed to load recent incidents: ${incidentsError.message}` },
+        { status: 500 },
+      );
+    }
+
+    incidentRows = incidentsData ?? [];
+  }
+
   const userIds = Array.from(
     new Set(
       [
         ...tickets.flatMap((ticket) => [ticket.created_by, ticket.assignee_id]),
         ...orderEvents.map((event) => event.actor_user_id),
         ...auditLogs.map((log) => log.actor_user_id),
+        ...communicationRows.map((communication) => communication.actor_user_id),
+        ...incidentRows.map((incident) => incident.created_by),
       ]
         .filter(Boolean)
         .map((id) => id as string),
@@ -320,7 +433,44 @@ export async function GET(_req: Request, context: RouteContext) {
     0,
   );
 
+  const communications: CustomerCommunicationItem[] = communicationRows.map((communication) => ({
+    id: communication.id,
+    customer_id: communication.customer_id,
+    channel: communication.channel,
+    direction: communication.direction,
+    subject: communication.subject,
+    body: communication.body,
+    preview: formatCommunicationPreview(communication.body, 180),
+    provider: communication.provider,
+    provider_message_id: communication.provider_message_id,
+    sender_name: communication.sender_name,
+    sender_email: communication.sender_email,
+    sender_phone: communication.sender_phone,
+    recipient_name: communication.recipient_name,
+    recipient_email: communication.recipient_email,
+    recipient_phone: communication.recipient_phone,
+    actor: communication.actor_user_id
+      ? usersById.get(communication.actor_user_id) ?? null
+      : null,
+    ticket_id: communication.ticket_id,
+    order_id: communication.order_id,
+    incident_id: communication.incident_id,
+    occurred_at: communication.occurred_at,
+    created_at: communication.created_at,
+  }));
+
+  const incidents: CustomerIncidentSummary[] = incidentRows.map((incident) => ({
+    id: incident.id,
+    title: incident.title,
+    status: incident.status,
+    severity: incident.severity,
+    is_public: incident.is_public,
+    started_at: incident.started_at,
+    resolved_at: incident.resolved_at,
+  }));
+
   const ordersById = new Map(orders.map((order) => [order.id, order]));
+  const incidentCreatorById = new Map(incidentRows.map((incident) => [incident.id, incident.created_by]));
   const activity: CustomerActivityItem[] = [];
 
   for (const event of orderEvents) {
@@ -343,6 +493,7 @@ export async function GET(_req: Request, context: RouteContext) {
       title,
       occurred_at: event.created_at,
       actor: event.actor_user_id ? usersById.get(event.actor_user_id) ?? null : null,
+      kind: "order",
     });
   }
 
@@ -352,6 +503,7 @@ export async function GET(_req: Request, context: RouteContext) {
       title: `Ticket #${toTicketCode(ticket.id)} created`,
       occurred_at: ticket.created_at,
       actor: ticket.creator,
+      kind: "ticket",
     });
   }
 
@@ -361,6 +513,36 @@ export async function GET(_req: Request, context: RouteContext) {
       title: toAuditTitle(log.action),
       occurred_at: log.created_at,
       actor: log.actor_user_id ? usersById.get(log.actor_user_id) ?? null : null,
+      kind: "audit",
+    });
+  }
+
+  for (const communication of communications) {
+    activity.push({
+      id: `communication-${communication.id}`,
+      title: toCommunicationActivityTitle({
+        channel: communication.channel,
+        direction: communication.direction,
+        subject: communication.subject,
+      }),
+      occurred_at: communication.occurred_at,
+      actor: communication.actor,
+      kind: "communication",
+      channel: communication.channel,
+      direction: communication.direction,
+      preview: communication.preview,
+    });
+  }
+
+  for (const incident of incidents) {
+    activity.push({
+      id: `incident-${incident.id}`,
+      title: `Incident (${incident.severity}): ${incident.title} (${incident.status})`,
+      occurred_at: incident.started_at,
+      actor: incidentCreatorById.get(incident.id)
+        ? usersById.get(incidentCreatorById.get(incident.id) as string) ?? null
+        : null,
+      kind: "incident",
     });
   }
 
@@ -370,6 +552,7 @@ export async function GET(_req: Request, context: RouteContext) {
       title: "Profile updated",
       occurred_at: customerRow.updated_at,
       actor: null,
+      kind: "audit",
     });
   }
 
@@ -389,6 +572,8 @@ export async function GET(_req: Request, context: RouteContext) {
     customer,
     tickets: responseTickets,
     orders,
+    communications,
+    incidents,
     activity: activity.slice(0, 100),
     activeOrgId,
     currentUserId: userId,
@@ -403,7 +588,7 @@ export async function PATCH(req: Request, context: RouteContext) {
     return NextResponse.json({ error: ctxResult.error }, { status: ctxResult.status });
   }
 
-  const { supabase, activeOrgId } = ctxResult.context;
+  const { supabase, activeOrgId, userId } = ctxResult.context;
   if (!activeOrgId) {
     return NextResponse.json(
       { error: "No active organization selected. Create or join an organization first." },
@@ -414,6 +599,30 @@ export async function PATCH(req: Request, context: RouteContext) {
   const customerId = await resolveCustomerId(context);
   if (!customerId) {
     return NextResponse.json({ error: "Customer id is required" }, { status: 400 });
+  }
+
+  const { data: existingCustomer, error: existingCustomerError } = await supabase
+    .from("customers")
+    .select("id, organization_id, name, email, phone, status, external_id, created_at, updated_at")
+    .eq("organization_id", activeOrgId)
+    .eq("id", customerId)
+    .maybeSingle<CustomerRow>();
+
+  if (existingCustomerError) {
+    if (isMissingTableInSchemaCache(existingCustomerError, "customers")) {
+      return NextResponse.json(
+        { error: missingTableMessageWithMigration("customers", "db/customers-schema.sql") },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json(
+      { error: `Failed to load customer: ${existingCustomerError.message}` },
+      { status: 500 },
+    );
+  }
+
+  if (!existingCustomer) {
+    return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   }
 
   let body: UpdateCustomerBody;
@@ -488,8 +697,18 @@ export async function PATCH(req: Request, context: RouteContext) {
     return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   }
 
+  const automationResult = await runCustomerAutomationEngine({
+    supabase,
+    organizationId: activeOrgId,
+    actorUserId: userId,
+    triggerEvent: "customer.updated",
+    customerBefore: existingCustomer as CustomerAutomationRow,
+    customerAfter: updatedCustomer as CustomerAutomationRow,
+  });
+
   const customer: CustomerListItem = {
     ...updatedCustomer,
+    ...automationResult.customer,
     open_tickets_count: 0,
     total_tickets_count: 0,
     total_orders_count: 0,

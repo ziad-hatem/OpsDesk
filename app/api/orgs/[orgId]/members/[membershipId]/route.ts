@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { getOrganizationActorContext } from "@/lib/server/organization-context";
 import { writeAuditLog } from "@/lib/server/audit-logs";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { isMissingTeamSchema, missingTeamSchemaMessage } from "@/lib/team/errors";
 import type { TeamMember } from "@/lib/team/types";
 import {
-  getRolePermissions,
   isMembershipStatus,
   isOrganizationRole,
 } from "@/lib/team/validation";
@@ -165,18 +165,61 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   if (includesRole) {
-    if (!getRolePermissions(actorRole).canChangeRoles) {
-      return NextResponse.json(
-        { error: "You do not have permission to change member roles" },
-        { status: 403 },
-      );
-    }
-
     if (!isOrganizationRole(body.role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
     const nextRole = body.role;
+    const authorizeRoleChange = await authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "action.team.member.role.change",
+      actionLabel: "Change team member role",
+      fallbackAllowed: actorRole === "admin",
+      useApprovalFlow: true,
+      entityType: "organization_membership",
+      entityId: membershipId,
+      payload: {
+        targetUserId: targetMembership.user_id,
+        nextRole,
+      },
+    });
+    if (!authorizeRoleChange.ok) {
+      return NextResponse.json(
+        {
+          error: authorizeRoleChange.error,
+          code: authorizeRoleChange.code,
+          approvalRequestId: authorizeRoleChange.approvalRequestId ?? null,
+        },
+        { status: authorizeRoleChange.status },
+      );
+    }
+
+    const rolePermissionKey =
+      nextRole === "admin"
+        ? "field.team.member.role.admin.assign"
+        : nextRole === "manager"
+          ? "field.team.member.role.manager.assign"
+          : nextRole === "support"
+            ? "field.team.member.role.support.assign"
+            : "field.team.member.role.read_only.assign";
+    const authorizeTargetRole = await authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: rolePermissionKey,
+      actionLabel: `Assign ${nextRole} role`,
+      fallbackAllowed: actorRole === "admin",
+      useApprovalFlow: false,
+    });
+    if (!authorizeTargetRole.ok) {
+      return NextResponse.json(
+        { error: authorizeTargetRole.error },
+        { status: authorizeTargetRole.status },
+      );
+    }
+
     if (targetMembership.role !== nextRole) {
       if (
         targetMembership.role === "admin" &&
@@ -265,10 +308,30 @@ export async function PATCH(req: Request, context: RouteContext) {
     return NextResponse.json({ member: mappedMemberResult.member }, { status: 200 });
   }
 
-  if (!getRolePermissions(actorRole).canSuspendRemove) {
+  const authorizeStatusChange = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: "action.team.member.status.change",
+    actionLabel: "Change team member status",
+    fallbackAllowed: actorRole === "admin",
+    useApprovalFlow: true,
+    entityType: "organization_membership",
+    entityId: membershipId,
+    payload: {
+      targetUserId: targetMembership.user_id,
+      currentStatus: targetMembership.status,
+      nextStatus: body.status,
+    },
+  });
+  if (!authorizeStatusChange.ok) {
     return NextResponse.json(
-      { error: "You do not have permission to update member status" },
-      { status: 403 },
+      {
+        error: authorizeStatusChange.error,
+        code: authorizeStatusChange.code,
+        approvalRequestId: authorizeStatusChange.approvalRequestId ?? null,
+      },
+      { status: authorizeStatusChange.status },
     );
   }
 
@@ -389,10 +452,25 @@ export async function DELETE(_req: Request, context: RouteContext) {
     actorMembership: { role: actorRole },
   } = actorContextResult.context;
 
-  if (!getRolePermissions(actorRole).canSuspendRemove) {
+  const authorizeRemove = await authorizeRbacAction({
+    supabase,
+    organizationId: orgId,
+    userId,
+    permissionKey: "action.team.member.remove",
+    actionLabel: "Remove team member",
+    fallbackAllowed: actorRole === "admin",
+    useApprovalFlow: true,
+    entityType: "organization_membership",
+    entityId: membershipId,
+  });
+  if (!authorizeRemove.ok) {
     return NextResponse.json(
-      { error: "You do not have permission to remove members" },
-      { status: 403 },
+      {
+        error: authorizeRemove.error,
+        code: authorizeRemove.code,
+        approvalRequestId: authorizeRemove.approvalRequestId ?? null,
+      },
+      { status: authorizeRemove.status },
     );
   }
 

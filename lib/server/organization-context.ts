@@ -8,6 +8,7 @@ type ActorMembershipRow = {
   id: string;
   role: OrganizationRole;
   status: MembershipStatus;
+  custom_role_id?: string | null;
 };
 
 export interface OrganizationActorContext {
@@ -41,23 +42,54 @@ export async function getOrganizationActorContext(
 
   const { data: actorMembership, error: actorMembershipError } = await supabase
     .from("organization_memberships")
-    .select("id, role, status")
+    .select("id, role, status, custom_role_id")
     .eq("organization_id", orgId)
     .eq("user_id", userId)
     .maybeSingle<ActorMembershipRow>();
 
+  let membership = actorMembership;
   if (actorMembershipError) {
-    if (isMissingTeamSchema(actorMembershipError)) {
-      return { ok: false, status: 500, error: missingTeamSchemaMessage() };
+    const missingCustomRoleColumn = actorMembershipError.message
+      .toLowerCase()
+      .includes("custom_role_id");
+    if (missingCustomRoleColumn) {
+      const fallbackMembership = await supabase
+        .from("organization_memberships")
+        .select("id, role, status")
+        .eq("organization_id", orgId)
+        .eq("user_id", userId)
+        .maybeSingle<Omit<ActorMembershipRow, "custom_role_id">>();
+
+      if (fallbackMembership.error) {
+        if (isMissingTeamSchema(fallbackMembership.error)) {
+          return { ok: false, status: 500, error: missingTeamSchemaMessage() };
+        }
+        return {
+          ok: false,
+          status: 500,
+          error: `Failed to verify organization membership: ${fallbackMembership.error.message}`,
+        };
+      }
+
+      membership = fallbackMembership.data
+        ? {
+            ...fallbackMembership.data,
+            custom_role_id: null,
+          }
+        : null;
+    } else {
+      if (isMissingTeamSchema(actorMembershipError)) {
+        return { ok: false, status: 500, error: missingTeamSchemaMessage() };
+      }
+      return {
+        ok: false,
+        status: 500,
+        error: `Failed to verify organization membership: ${actorMembershipError.message}`,
+      };
     }
-    return {
-      ok: false,
-      status: 500,
-      error: `Failed to verify organization membership: ${actorMembershipError.message}`,
-    };
   }
 
-  if (!actorMembership) {
+  if (!membership) {
     return {
       ok: false,
       status: 403,
@@ -65,7 +97,7 @@ export async function getOrganizationActorContext(
     };
   }
 
-  if (actorMembership.status !== "active") {
+  if (membership.status !== "active") {
     return {
       ok: false,
       status: 403,
@@ -79,7 +111,7 @@ export async function getOrganizationActorContext(
       supabase,
       userId,
       orgId,
-      actorMembership,
+      actorMembership: membership,
     },
   };
 }

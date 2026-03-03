@@ -9,6 +9,7 @@ import {
   normalizePortalEmail,
 } from "@/lib/server/customer-portal-auth";
 import { sendCustomerPortalAccessEmail } from "@/lib/server/customer-portal-email";
+import { runPortalEventAutomationEngine } from "@/lib/server/automation-engine";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 export const runtime = "nodejs";
@@ -152,6 +153,30 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
+
+    await runPortalEventAutomationEngine({
+      supabase,
+      organizationId: customer.organization_id,
+      triggerEvent: "portal.auth_link_requested",
+      portalEvent: {
+        id: tokenHash,
+        organization_id: customer.organization_id,
+        event_name: "portal.auth_link_requested",
+        entity_type: "customer",
+        entity_id: customer.id,
+        title: customer.name,
+        status: customer.status,
+        customer_id: customer.id,
+        email,
+        metadata: {
+          requestedIp,
+          userAgent,
+          expiresAt,
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    });
 
     try {
       await sendCustomerPortalAccessEmail({

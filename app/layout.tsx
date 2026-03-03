@@ -70,7 +70,7 @@ function LayoutShell({
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-auto">
+        <main className="workspace-main flex-1 overflow-auto">
           {children}
           <Toaster />
         </main>

@@ -8,6 +8,7 @@ import {
   normalizeText,
   resolveOrganizationRole,
 } from "@/lib/server/incidents";
+import { authorizeRbacAction } from "@/lib/server/rbac";
 import { missingTableMessageWithMigration } from "@/lib/tickets/errors";
 
 type RouteContext = {
@@ -46,16 +47,31 @@ export async function PATCH(req: Request, context: RouteContext) {
     organizationId: activeOrgId,
     userId,
   });
-  if (!canManageIncidents(role)) {
-    return NextResponse.json(
-      { error: "Only admin, manager, or support can edit services" },
-      { status: 403 },
-    );
-  }
-
   const serviceId = await resolveServiceId(context);
   if (!serviceId) {
     return NextResponse.json({ error: "serviceId is required" }, { status: 400 });
+  }
+
+  const authorizeServiceUpdate = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.incidents.update",
+    actionLabel: "Update incident service",
+    fallbackAllowed: canManageIncidents(role),
+    useApprovalFlow: true,
+    entityType: "status_service",
+    entityId: serviceId,
+  });
+  if (!authorizeServiceUpdate.ok) {
+    return NextResponse.json(
+      {
+        error: authorizeServiceUpdate.error,
+        code: authorizeServiceUpdate.code,
+        approvalRequestId: authorizeServiceUpdate.approvalRequestId ?? null,
+      },
+      { status: authorizeServiceUpdate.status },
+    );
   }
 
   let body: UpdateServiceBody = {};
@@ -167,16 +183,31 @@ export async function DELETE(_req: Request, context: RouteContext) {
     organizationId: activeOrgId,
     userId,
   });
-  if (!canManageIncidents(role)) {
-    return NextResponse.json(
-      { error: "Only admin, manager, or support can delete services" },
-      { status: 403 },
-    );
-  }
-
   const serviceId = await resolveServiceId(context);
   if (!serviceId) {
     return NextResponse.json({ error: "serviceId is required" }, { status: 400 });
+  }
+
+  const authorizeServiceDelete = await authorizeRbacAction({
+    supabase,
+    organizationId: activeOrgId,
+    userId,
+    permissionKey: "action.incidents.update",
+    actionLabel: "Delete incident service",
+    fallbackAllowed: canManageIncidents(role),
+    useApprovalFlow: true,
+    entityType: "status_service",
+    entityId: serviceId,
+  });
+  if (!authorizeServiceDelete.ok) {
+    return NextResponse.json(
+      {
+        error: authorizeServiceDelete.error,
+        code: authorizeServiceDelete.code,
+        approvalRequestId: authorizeServiceDelete.approvalRequestId ?? null,
+      },
+      { status: authorizeServiceDelete.status },
+    );
   }
 
   const { error } = await supabase
@@ -209,4 +240,3 @@ export async function DELETE(_req: Request, context: RouteContext) {
 
   return NextResponse.json({ success: true }, { status: 200 });
 }
-

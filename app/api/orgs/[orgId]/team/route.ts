@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { getOrganizationActorContext } from "@/lib/server/organization-context";
+import {
+  authorizeRbacAction,
+  fallbackAssignableInviteRoles,
+  fallbackAssignableMemberRoles,
+} from "@/lib/server/rbac";
 import { isMissingTeamSchema, missingTeamSchemaMessage } from "@/lib/team/errors";
 import type { TeamInvite, TeamMember, TeamResponse } from "@/lib/team/types";
-import { getRolePermissions } from "@/lib/team/validation";
 import type { OrganizationRole } from "@/lib/topbar/types";
 
 type RouteContext = {
@@ -59,8 +63,9 @@ export async function GET(_req: Request, context: RouteContext) {
   const {
     supabase,
     userId,
-    actorMembership: { role: actorRole },
+    actorMembership,
   } = actorContextResult.context;
+  const actorRole = actorMembership.role;
 
   const { data: membershipsData, error: membershipsError } = await supabase
     .from("organization_memberships")
@@ -175,11 +180,177 @@ export async function GET(_req: Request, context: RouteContext) {
     expires_at: invite.expires_at,
   }));
 
+  const actorForPermission = {
+    id: actorMembership.id,
+    userId,
+    role: actorMembership.role,
+    status: actorMembership.status,
+    customRoleId: actorMembership.custom_role_id ?? null,
+  };
+
+  const fallbackInviteRoles = fallbackAssignableInviteRoles(actorRole);
+  const fallbackMemberRoles = fallbackAssignableMemberRoles(actorRole);
+
+  const [
+    canInviteResult,
+    canChangeRolesResult,
+    canSuspendResult,
+    canRemoveResult,
+    inviteAdminResult,
+    inviteManagerResult,
+    inviteSupportResult,
+    inviteReadOnlyResult,
+    memberAdminResult,
+    memberManagerResult,
+    memberSupportResult,
+    memberReadOnlyResult,
+  ] = await Promise.all([
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "action.team.invite.create",
+      actionLabel: "View invite permissions",
+      fallbackAllowed: actorRole === "admin" || actorRole === "manager",
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "action.team.member.role.change",
+      actionLabel: "View member role permissions",
+      fallbackAllowed: actorRole === "admin",
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "action.team.member.status.change",
+      actionLabel: "View member status permissions",
+      fallbackAllowed: actorRole === "admin",
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "action.team.member.remove",
+      actionLabel: "View member remove permissions",
+      fallbackAllowed: actorRole === "admin",
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.invite.role.admin.assign",
+      actionLabel: "View admin invite permission",
+      fallbackAllowed: fallbackInviteRoles.includes("admin"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.invite.role.manager.assign",
+      actionLabel: "View manager invite permission",
+      fallbackAllowed: fallbackInviteRoles.includes("manager"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.invite.role.support.assign",
+      actionLabel: "View support invite permission",
+      fallbackAllowed: fallbackInviteRoles.includes("support"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.invite.role.read_only.assign",
+      actionLabel: "View read-only invite permission",
+      fallbackAllowed: fallbackInviteRoles.includes("read_only"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.member.role.admin.assign",
+      actionLabel: "View admin member role permission",
+      fallbackAllowed: fallbackMemberRoles.includes("admin"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.member.role.manager.assign",
+      actionLabel: "View manager member role permission",
+      fallbackAllowed: fallbackMemberRoles.includes("manager"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.member.role.support.assign",
+      actionLabel: "View support member role permission",
+      fallbackAllowed: fallbackMemberRoles.includes("support"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+    authorizeRbacAction({
+      supabase,
+      organizationId: orgId,
+      userId,
+      permissionKey: "field.team.member.role.read_only.assign",
+      actionLabel: "View read-only member role permission",
+      fallbackAllowed: fallbackMemberRoles.includes("read_only"),
+      useApprovalFlow: false,
+      actorMembership: actorForPermission,
+    }),
+  ]);
+
+  const assignableInviteRoles: OrganizationRole[] = [];
+  if (inviteAdminResult.ok) assignableInviteRoles.push("admin");
+  if (inviteManagerResult.ok) assignableInviteRoles.push("manager");
+  if (inviteSupportResult.ok) assignableInviteRoles.push("support");
+  if (inviteReadOnlyResult.ok) assignableInviteRoles.push("read_only");
+
+  const assignableMemberRoles: OrganizationRole[] = [];
+  if (memberAdminResult.ok) assignableMemberRoles.push("admin");
+  if (memberManagerResult.ok) assignableMemberRoles.push("manager");
+  if (memberSupportResult.ok) assignableMemberRoles.push("support");
+  if (memberReadOnlyResult.ok) assignableMemberRoles.push("read_only");
+
   const payload: TeamResponse = {
     activeOrgId: orgId,
     currentUserId: userId,
     currentUserRole: actorRole,
-    permissions: getRolePermissions(actorRole),
+    permissions: {
+      canInvite: canInviteResult.ok,
+      canChangeRoles: canChangeRolesResult.ok,
+      canSuspendRemove: canSuspendResult.ok || canRemoveResult.ok,
+      manageableInviteRoles: [...assignableInviteRoles],
+      assignableInviteRoles: [...assignableInviteRoles],
+      assignableMemberRoles: [...assignableMemberRoles],
+    },
     members,
     invites,
   };
