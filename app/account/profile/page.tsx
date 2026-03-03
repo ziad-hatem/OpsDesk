@@ -1234,13 +1234,27 @@ export default function AccountProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="md:col-span-2 space-y-2">
                 <Label htmlFor="passkey-name">Passkey Name</Label>
-                <Input
-                  id="passkey-name"
-                  value={passkeyFriendlyName}
-                  onChange={(event) => setPasskeyFriendlyName(event.target.value)}
-                  placeholder="My Laptop Passkey"
-                  disabled={disableActions || isRegisteringPasskey}
-                />
+                <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Input
+                        id="passkey-name"
+                        value={passkeyFriendlyName}
+                        onChange={(event) => setPasskeyFriendlyName(event.target.value)}
+                        placeholder="My Laptop Passkey"
+                        disabled={disableActions || isRegisteringPasskey}
+                        className="h-11 border-slate-300 bg-white text-sm font-medium shadow-none focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Use a recognizable device label like Work Laptop or
+                        iPhone 16 Pro.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <p className="text-xs text-slate-500">
                   On desktop, choose your phone/tablet from the browser passkey prompt.
                   Keep Bluetooth enabled for cross-device setup.
@@ -1248,7 +1262,7 @@ export default function AccountProfilePage() {
               </div>
               <div className="flex items-end">
                 <Button
-                  className="w-full"
+                  className="w-full md:h-11"
                   onClick={handleRegisterPasskey}
                   disabled={
                     disableActions ||

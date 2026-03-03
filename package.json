@@ -12,7 +12,10 @@
     "test:unit": "vitest run tests/unit",
     "test:components": "vitest run tests/components",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "tinker": "node --env-file=.env.local scripts/tinker.mjs",
+    "tinker:list": "node --env-file=.env.local scripts/tinker.mjs --list-scenarios",
+    "tinker:users": "node --env-file=.env.local scripts/tinker.mjs --list-users"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
