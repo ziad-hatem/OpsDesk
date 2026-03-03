@@ -359,18 +359,22 @@ export default function NotificationsCenterPage() {
           <div className="flex flex-wrap items-center gap-2">
             <PageTitle>Notifications</PageTitle>
             {unreadCount > 0 ? (
-              <Badge className="bg-red-600 text-white hover:bg-red-600">
+              <Badge className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 {unreadCount} unread
               </Badge>
             ) : null}
             <Badge
               variant="outline"
-              className={isRealtimeFresh ? "border-emerald-300 text-emerald-700" : ""}
+              className={
+                isRealtimeFresh
+                  ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                  : ""
+              }
             >
               <Circle
                 className={`mr-1.5 h-2.5 w-2.5 ${
                   isRealtimeFresh
-                    ? "fill-emerald-500 text-emerald-500"
+                    ? "fill-emerald-500 text-emerald-500 dark:fill-emerald-400 dark:text-emerald-400"
                     : "fill-muted-foreground/40 text-muted-foreground/60"
                 }`}
               />
@@ -472,7 +476,7 @@ export default function NotificationsCenterPage() {
               <Card
                 key={notification.id}
                 className={`micro-interactive cursor-pointer transition-all duration-200 ${
-                  isUnread ? "border-blue-200 bg-blue-50/70" : "bg-background"
+                  isUnread ? "border-primary/30 bg-primary/10" : "border-border/70 bg-card"
                 }`}
                 onClick={() => setSelectedNotification(notification)}
               >
@@ -480,14 +484,12 @@ export default function NotificationsCenterPage() {
                   <div className="flex items-start gap-4">
                     <div
                       className={`rounded-lg p-2 ${
-                        isUnread ? "bg-blue-100" : "bg-muted"
+                        isUnread
+                          ? "bg-primary/15 text-primary"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      <Icon
-                        className={`h-5 w-5 ${
-                          isUnread ? "text-blue-600" : "text-muted-foreground"
-                        }`}
-                      />
+                      <Icon className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-4">
