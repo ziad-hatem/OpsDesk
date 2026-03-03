@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -97,14 +98,21 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center">
-              <span className="font-bold text-white text-xl">OD</span>
+            <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-border bg-background">
+              <Image
+                src="/logo.webp"
+                alt="OpsDesk logo"
+                fill
+                className="object-cover"
+                sizes="48px"
+                priority
+              />
             </div>
-            <span className="text-2xl font-semibold text-slate-900">
+            <span className="text-2xl font-semibold text-foreground">
               OpsDesk
             </span>
           </div>
@@ -117,7 +125,7 @@ export default function Page() {
           </CardHeader>
           <CardContent>
             {checkingLink ? (
-              <div className="flex items-center justify-center text-sm text-slate-500 py-4">
+              <div className="flex items-center justify-center text-sm text-muted-foreground py-4">
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Verifying reset link...
               </div>
@@ -188,3 +196,4 @@ export default function Page() {
     </div>
   );
 }
+

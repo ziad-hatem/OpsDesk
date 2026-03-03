@@ -16,7 +16,7 @@ export default function SettingsNav() {
   const pathname = usePathname();
 
   return (
-    <div className="inline-flex w-fit items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+    <div className="inline-flex w-fit items-center gap-1 rounded-lg border border-border bg-background p-1">
       {SETTINGS_ITEMS.map((item) => {
         const isActive = pathname === item.href;
         return (
@@ -26,8 +26,8 @@ export default function SettingsNav() {
             className={cn(
               "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               isActive
-                ? "bg-slate-900 text-white"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             {item.label}
@@ -37,3 +37,4 @@ export default function SettingsNav() {
     </div>
   );
 }
+

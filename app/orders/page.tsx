@@ -415,7 +415,7 @@ export default function OrdersListPage() {
         cell: ({ row }) => (
           <button
             onClick={() => router.push(`/orders/${row.original.id}`)}
-            className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+            className="font-medium text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
           >
             {row.original.order_number}
           </button>
@@ -428,12 +428,12 @@ export default function OrdersListPage() {
           row.original.customer ? (
             <button
               onClick={() => router.push(`/customers/${row.original.customer?.id}`)}
-              className="text-slate-700 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+              className="text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
             >
               {row.original.customer.name}
             </button>
           ) : (
-            <span className="text-slate-400">-</span>
+            <span className="text-muted-foreground/70">-</span>
           ),
       },
       {
@@ -471,7 +471,7 @@ export default function OrdersListPage() {
         accessorKey: "total_amount",
         header: "Total",
         cell: ({ row }) => (
-          <span className="font-medium text-slate-900">
+          <span className="font-medium text-foreground">
             {formatMoney(row.original.total_amount, row.original.currency)}
           </span>
         ),
@@ -479,13 +479,13 @@ export default function OrdersListPage() {
       {
         accessorKey: "currency",
         header: "Currency",
-        cell: ({ row }) => <span className="text-slate-700">{row.original.currency}</span>,
+        cell: ({ row }) => <span className="text-foreground">{row.original.currency}</span>,
       },
       {
         accessorKey: "created_at",
         header: "Created",
         cell: ({ row }) => (
-          <span className="text-slate-600">{formatDateTime(row.original.created_at)}</span>
+          <span className="text-muted-foreground">{formatDateTime(row.original.created_at)}</span>
         ),
       },
     ],
@@ -726,20 +726,20 @@ export default function OrdersListPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Orders</h1>
-          <p className="text-slate-600 mt-1">Track and manage customer orders</p>
+          <h1 className="text-3xl font-semibold text-foreground">Orders</h1>
+          <p className="text-muted-foreground mt-1">Track and manage customer orders</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            className="gap-2 focus:ring-2 focus:ring-slate-900"
+            className="gap-2 focus:ring-2 focus:ring-ring"
             onClick={handleExportCsv}
           >
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
           <Button
-            className="gap-2 focus:ring-2 focus:ring-slate-900"
+            className="gap-2 focus:ring-2 focus:ring-ring"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <Plus className="w-4 h-4" />
@@ -757,7 +757,7 @@ export default function OrdersListPage() {
                 setFilters((prev) => ({ ...prev, search: event.target.value }))
               }
               placeholder="Search order number or notes..."
-              className="w-full sm:w-[260px] focus:ring-2 focus:ring-slate-900"
+              className="w-full sm:w-[260px] focus:ring-2 focus:ring-ring"
             />
             <Select
               value={filters.status}
@@ -768,7 +768,7 @@ export default function OrdersListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -790,7 +790,7 @@ export default function OrdersListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Payment" />
               </SelectTrigger>
               <SelectContent>
@@ -812,7 +812,7 @@ export default function OrdersListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Customer" />
               </SelectTrigger>
               <SelectContent>
@@ -831,7 +831,7 @@ export default function OrdersListPage() {
               onChange={(event) =>
                 setFilters((prev) => ({ ...prev, createdFrom: event.target.value }))
               }
-              className="w-[180px] focus:ring-2 focus:ring-slate-900"
+              className="w-[180px] focus:ring-2 focus:ring-ring"
             />
             <Input
               type="date"
@@ -839,13 +839,13 @@ export default function OrdersListPage() {
               onChange={(event) =>
                 setFilters((prev) => ({ ...prev, createdTo: event.target.value }))
               }
-              className="w-[180px] focus:ring-2 focus:ring-slate-900"
+              className="w-[180px] focus:ring-2 focus:ring-ring"
             />
           </div>
 
           <div className="flex items-center gap-2">
             <Select value={selectedViewId} onValueChange={handleApplySavedView}>
-              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Saved view" />
               </SelectTrigger>
               <SelectContent>
@@ -861,7 +861,7 @@ export default function OrdersListPage() {
               value={saveViewScope}
               onValueChange={(value) => setSaveViewScope(value as SavedViewScope)}
             >
-              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Scope" />
               </SelectTrigger>
               <SelectContent>
@@ -886,7 +886,7 @@ export default function OrdersListPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-500">
+        <div className="rounded-lg border border-border bg-background p-10 text-center text-muted-foreground">
           <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
           Loading orders...
         </div>
@@ -1021,7 +1021,7 @@ export default function OrdersListPage() {
                 </Button>
               </div>
               {createLineItems.length === 0 ? (
-                <p className="text-xs text-slate-500">No line items.</p>
+                <p className="text-xs text-muted-foreground">No line items.</p>
               ) : (
                 <div className="space-y-2">
                   {createLineItems.map((item) => (
@@ -1087,7 +1087,7 @@ export default function OrdersListPage() {
                   ))}
                 </div>
               )}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 If line items are provided, subtotal is auto-calculated from line items and unit prices.
               </p>
             </div>
@@ -1153,3 +1153,4 @@ export default function OrdersListPage() {
     </div>
   );
 }
+

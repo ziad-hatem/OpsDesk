@@ -492,7 +492,7 @@ export default function OrderDetailPage() {
     return (
       <div className="p-6">
         <Card>
-          <CardContent className="flex items-center justify-center py-12 text-slate-500">
+          <CardContent className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading order...
           </CardContent>
@@ -509,7 +509,7 @@ export default function OrderDetailPage() {
           Back to Orders
         </Button>
         <Card>
-          <CardContent className="py-10 text-center text-slate-600">
+          <CardContent className="py-10 text-center text-muted-foreground">
             {error ?? "Order not found."}
           </CardContent>
         </Card>
@@ -524,17 +524,17 @@ export default function OrderDetailPage() {
           variant="outline"
           size="icon"
           onClick={() => router.push("/orders")}
-          className="focus:ring-2 focus:ring-slate-900"
+          className="focus:ring-2 focus:ring-ring"
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-semibold text-slate-900">{order.order_number}</h1>
+            <h1 className="text-3xl font-semibold text-foreground">{order.order_number}</h1>
             <StatusBadge status={order.status} />
             <StatusBadge status={order.payment_status} />
           </div>
-          <p className="text-slate-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Created {formatDateTime(order.created_at)}
           </p>
         </div>
@@ -548,53 +548,53 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Customer</Label>
+                <Label className="text-sm text-muted-foreground mb-1 block">Customer</Label>
                 {order.customer ? (
                   <div className="space-y-1">
                     <button
                       onClick={() => router.push(`/customers/${order.customer?.id}`)}
-                      className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+                      className="font-medium text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
                     >
                       {order.customer.name}
                     </button>
-                    <p className="text-sm text-slate-600">{order.customer.email ?? "No email"}</p>
+                    <p className="text-sm text-muted-foreground">{order.customer.email ?? "No email"}</p>
                   </div>
                 ) : (
-                  <p className="font-medium text-slate-400">Unknown customer</p>
+                  <p className="font-medium text-muted-foreground/70">Unknown customer</p>
                 )}
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Created By</Label>
-                <p className="font-medium text-slate-900">
+                <Label className="text-sm text-muted-foreground mb-1 block">Created By</Label>
+                <p className="font-medium text-foreground">
                   {order.creator?.name ?? order.creator?.email ?? "-"}
                 </p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Subtotal</Label>
-                <p className="font-medium text-slate-900">
+                <Label className="text-sm text-muted-foreground mb-1 block">Subtotal</Label>
+                <p className="font-medium text-foreground">
                   {formatMoney(order.subtotal_amount, order.currency)}
                 </p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Tax</Label>
-                <p className="font-medium text-slate-900">
+                <Label className="text-sm text-muted-foreground mb-1 block">Tax</Label>
+                <p className="font-medium text-foreground">
                   {formatMoney(order.tax_amount, order.currency)}
                 </p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Discount</Label>
-                <p className="font-medium text-slate-900">
+                <Label className="text-sm text-muted-foreground mb-1 block">Discount</Label>
+                <p className="font-medium text-foreground">
                   {formatMoney(order.discount_amount, order.currency)}
                 </p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Total</Label>
-                <p className="font-semibold text-slate-900 text-lg">
+                <Label className="text-sm text-muted-foreground mb-1 block">Total</Label>
+                <p className="font-semibold text-foreground text-lg">
                   {formatMoney(order.total_amount, order.currency)}
                 </p>
               </div>
@@ -606,7 +606,7 @@ export default function OrderDetailPage() {
               <CardTitle>Line Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -619,14 +619,14 @@ export default function OrderDetailPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-slate-500">
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
                           No line items added to this order.
                         </TableCell>
                       </TableRow>
                     ) : (
                       items.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium text-slate-900">{item.name}</TableCell>
+                          <TableCell className="font-medium text-foreground">{item.name}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">
                             {formatMoney(item.unit_price_amount, order.currency)}
@@ -641,7 +641,7 @@ export default function OrderDetailPage() {
                       <TableCell colSpan={3} className="text-right font-semibold">
                         Total
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-slate-900">
+                      <TableCell className="text-right font-semibold text-foreground">
                         {formatMoney(order.total_amount, order.currency)}
                       </TableCell>
                     </TableRow>
@@ -682,7 +682,7 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Unit price is entered in normal currency format (example: 999.00).
                 </p>
                 <Button onClick={handleAddLineItem} disabled={isAddingLineItem}>
@@ -708,21 +708,21 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {attachments.length === 0 ? (
-                <p className="text-sm text-slate-500">No attachments uploaded yet.</p>
+                <p className="text-sm text-muted-foreground">No attachments uploaded yet.</p>
               ) : (
                 <div className="space-y-2">
                   {attachments.map((attachment) => (
                     <div
                       key={attachment.id}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3 hover:bg-slate-50"
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-3 hover:bg-muted/50"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="rounded bg-slate-100 p-2">
-                          <Paperclip className="h-4 w-4 text-slate-600" />
+                        <div className="rounded bg-muted p-2">
+                          <Paperclip className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{attachment.file_name}</p>
-                          <p className="text-xs text-slate-600">
+                          <p className="truncate font-medium text-foreground">{attachment.file_name}</p>
+                          <p className="text-xs text-muted-foreground">
                             {formatBytes(attachment.file_size)} - Uploaded by{" "}
                             {attachment.uploader?.name ?? attachment.uploader?.email ?? "Unknown"} on{" "}
                             {formatDateTime(attachment.created_at)}
@@ -764,11 +764,11 @@ export default function OrderDetailPage() {
                   {selectedFiles.map((file, index) => (
                     <div
                       key={`${file.name}-${file.lastModified}-${index}`}
-                      className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"
+                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-900">{file.name}</p>
-                        <p className="text-xs text-slate-500">{formatBytes(file.size)}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
                       </div>
                       <Button
                         variant="ghost"
@@ -822,7 +822,7 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label className="text-sm text-slate-600 mb-2 block">Status</Label>
+                <Label className="text-sm text-muted-foreground mb-2 block">Status</Label>
                 <Select
                   value={order.status}
                   onValueChange={(value) =>
@@ -844,7 +844,7 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="space-y-3">
-                <Label className="text-sm text-slate-600 block">Payment Status</Label>
+                <Label className="text-sm text-muted-foreground block">Payment Status</Label>
                 <StatusBadge status={order.payment_status} />
                 <Button
                   variant="outline"
@@ -874,7 +874,7 @@ export default function OrderDetailPage() {
                     href={order.payment_link_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-slate-700 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-foreground hover:underline"
                   >
                     Open latest payment link
                     <ExternalLink className="h-3 w-3" />
@@ -883,7 +883,7 @@ export default function OrderDetailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-slate-600">Notes</Label>
+                <Label className="text-sm text-muted-foreground">Notes</Label>
                 <Textarea
                   value={notesDraft}
                   onChange={(event) => setNotesDraft(event.target.value)}
@@ -910,32 +910,32 @@ export default function OrderDetailPage() {
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Placed At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.placed_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Placed At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.placed_at)}</p>
               </div>
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Paid At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.paid_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Paid At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.paid_at)}</p>
               </div>
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Payment Link Sent</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.payment_link_sent_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Payment Link Sent</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.payment_link_sent_at)}</p>
               </div>
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Payment Completed</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.payment_completed_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Payment Completed</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.payment_completed_at)}</p>
               </div>
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Fulfilled At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.fulfilled_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Fulfilled At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.fulfilled_at)}</p>
               </div>
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Cancelled At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.cancelled_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Cancelled At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.cancelled_at)}</p>
               </div>
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Updated At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(order.updated_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Updated At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(order.updated_at)}</p>
               </div>
             </CardContent>
           </Card>
@@ -946,11 +946,11 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent>
               {statusEvents.length === 0 ? (
-                <p className="text-sm text-slate-500">No status changes yet.</p>
+                <p className="text-sm text-muted-foreground">No status changes yet.</p>
               ) : (
                 <div className="space-y-4">
                   {statusEvents.map((event) => (
-                    <div key={event.id} className="rounded-lg border border-slate-200 p-3">
+                    <div key={event.id} className="rounded-lg border border-border p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <StatusBadge status={event.to_status} />
@@ -958,14 +958,14 @@ export default function OrderDetailPage() {
                             {event.from_status} to {event.to_status}
                           </Badge>
                         </div>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           {formatDateTime(event.created_at)}
                         </span>
                       </div>
                       {event.reason && (
-                        <p className="mt-2 text-sm text-slate-700">{event.reason}</p>
+                        <p className="mt-2 text-sm text-foreground">{event.reason}</p>
                       )}
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         By {event.actor?.name ?? event.actor?.email ?? "System"}
                       </p>
                     </div>

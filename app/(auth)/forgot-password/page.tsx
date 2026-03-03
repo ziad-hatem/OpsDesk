@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -58,14 +59,21 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center">
-              <span className="font-bold text-white text-xl">OD</span>
+            <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-border bg-background">
+              <Image
+                src="/logo.webp"
+                alt="OpsDesk logo"
+                fill
+                className="object-cover"
+                sizes="48px"
+                priority
+              />
             </div>
-            <span className="text-2xl font-semibold text-slate-900">
+            <span className="text-2xl font-semibold text-foreground">
               OpsDesk
             </span>
           </div>
@@ -112,14 +120,14 @@ export default function Page() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={loading}
-                      className="focus:ring-2 focus:ring-slate-900"
+                      className="focus:ring-2 focus:ring-ring"
                       required
                     />
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full focus:ring-2 focus:ring-slate-900"
+                    className="w-full focus:ring-2 focus:ring-ring"
                     disabled={loading}
                   >
                     {loading ? (
@@ -132,11 +140,11 @@ export default function Page() {
                     )}
                   </Button>
 
-                  <div className="text-center text-sm text-slate-500">
+                  <div className="text-center text-sm text-muted-foreground">
                     Remembered your password?{" "}
                     <button
                       type="button"
-                      className="text-slate-900 font-medium hover:underline"
+                      className="text-foreground font-medium hover:underline"
                       onClick={() => router.push("/login")}
                       disabled={loading}
                     >
@@ -152,3 +160,4 @@ export default function Page() {
     </div>
   );
 }
+

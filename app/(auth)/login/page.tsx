@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2, Mail, ShieldCheck } from "lucide-react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
@@ -449,22 +450,29 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-50 px-4 py-6 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/40 to-background px-4 py-8 flex items-center justify-center">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center justify-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-lg font-bold text-white">
-            OD
+          <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-border bg-background">
+            <Image
+              src="/logo.webp"
+              alt="OpsDesk logo"
+              fill
+              className="object-cover"
+              sizes="44px"
+              priority
+            />
           </div>
           <div>
-            <p className="text-lg font-semibold text-slate-900">OpsDesk</p>
-            <p className="text-xs text-slate-500">OpsDesk Access</p>
+            <p className="text-lg font-semibold text-foreground">OpsDesk</p>
+            <p className="text-xs text-muted-foreground">OpsDesk Access</p>
           </div>
         </div>
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-border/70 bg-card/95 shadow-xl dark:bg-secondary/60">
           {isVerified ? (
             <div className="flex flex-col items-center justify-center p-8 text-center">
-              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <CheckCircle2 className="h-8 w-8" />
               </div>
               <CardTitle className="text-xl">Email Verified</CardTitle>
               <CardDescription className="mt-2">
@@ -484,7 +492,7 @@ export default function Page() {
           ) : requiresMfa ? (
             <>
               <CardHeader className="space-y-3">
-                <div className="inline-flex w-fit items-center gap-1 rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Step 2 of 2
                 </div>
@@ -502,7 +510,7 @@ export default function Page() {
                 ) : null}
 
                 {mfaInfo ? (
-                  <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                     {mfaInfo}
                   </p>
                 ) : null}
@@ -592,7 +600,7 @@ export default function Page() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     disabled={disableLoginActions}
-                    className="focus:ring-2 focus:ring-slate-900"
+                    className="focus:ring-2 focus:ring-ring"
                     required
                   />
                 </div>
@@ -613,14 +621,14 @@ export default function Page() {
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
                           disabled={disableLoginActions}
-                          className="focus:ring-2 focus:ring-slate-900"
+                          className="focus:ring-2 focus:ring-ring"
                           required
                         />
                         <div className="text-right">
                           <button
                             type="button"
                             onClick={() => router.push("/forgot-password")}
-                            className="text-sm font-medium text-slate-900 hover:underline"
+                            className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
                             disabled={disableLoginActions}
                           >
                             Forgot password?
@@ -630,7 +638,7 @@ export default function Page() {
 
                       <Button
                         type="submit"
-                        className="w-full focus:ring-2 focus:ring-slate-900"
+                        className="w-full focus:ring-2 focus:ring-ring"
                         disabled={disableLoginActions}
                       >
                         {loading ? (
@@ -646,7 +654,7 @@ export default function Page() {
                   </TabsContent>
 
                   <TabsContent value="magic-link" className="mt-4 space-y-3">
-                    <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                       We will email you a secure sign-in link.
                     </p>
                     <Button
@@ -671,7 +679,7 @@ export default function Page() {
                   </TabsContent>
                 </Tabs>
 
-                <div className="space-y-3 border-t border-slate-200 pt-4">
+                <div className="space-y-3 border-t border-border pt-4">
                   <Button
                     type="button"
                     variant="outline"
@@ -691,17 +699,17 @@ export default function Page() {
                       </>
                     )}
                   </Button>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     Passkey sign-in requires an existing local session on this device.
                   </p>
                 </div>
 
-                <p className="text-center text-sm text-slate-500">
+                <p className="text-center text-sm text-muted-foreground">
                   Don&apos;t have an account?{" "}
                   <button
                     type="button"
                     onClick={() => router.push("/register")}
-                    className="font-medium text-slate-900 hover:underline"
+                    className="font-medium text-foreground hover:underline"
                     disabled={disableLoginActions}
                   >
                     Create account
@@ -715,3 +723,4 @@ export default function Page() {
     </div>
   );
 }
+

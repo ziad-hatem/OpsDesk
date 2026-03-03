@@ -369,7 +369,9 @@ export default function NotificationsCenterPage() {
             >
               <Circle
                 className={`mr-1.5 h-2.5 w-2.5 ${
-                  isRealtimeFresh ? "fill-emerald-500 text-emerald-500" : "fill-slate-300 text-slate-300"
+                  isRealtimeFresh
+                    ? "fill-emerald-500 text-emerald-500"
+                    : "fill-muted-foreground/40 text-muted-foreground/60"
                 }`}
               />
               {isRealtimeFresh ? "Live updates" : "Waiting for realtime"}
@@ -437,7 +439,7 @@ export default function NotificationsCenterPage() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="flex items-center justify-center py-12 text-slate-500">
+          <CardContent className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             Loading notifications...
           </CardContent>
@@ -470,7 +472,7 @@ export default function NotificationsCenterPage() {
               <Card
                 key={notification.id}
                 className={`micro-interactive cursor-pointer transition-all duration-200 ${
-                  isUnread ? "border-blue-200 bg-blue-50/70" : "bg-white"
+                  isUnread ? "border-blue-200 bg-blue-50/70" : "bg-background"
                 }`}
                 onClick={() => setSelectedNotification(notification)}
               >
@@ -478,25 +480,25 @@ export default function NotificationsCenterPage() {
                   <div className="flex items-start gap-4">
                     <div
                       className={`rounded-lg p-2 ${
-                        isUnread ? "bg-blue-100" : "bg-slate-100"
+                        isUnread ? "bg-blue-100" : "bg-muted"
                       }`}
                     >
                       <Icon
                         className={`h-5 w-5 ${
-                          isUnread ? "text-blue-600" : "text-slate-600"
+                          isUnread ? "text-blue-600" : "text-muted-foreground"
                         }`}
                       />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <p className="mb-1 font-medium text-slate-900">{notification.title}</p>
+                          <p className="mb-1 font-medium text-foreground">{notification.title}</p>
                           {description ? (
-                            <p className="max-h-10 overflow-hidden text-sm text-slate-600">
+                            <p className="max-h-10 overflow-hidden text-sm text-muted-foreground">
                               {description}
                             </p>
                           ) : null}
-                          <p className="mt-2 text-xs text-slate-500">
+                          <p className="mt-2 text-xs text-muted-foreground">
                             {getRelativeTime(notification.created_at)}
                           </p>
                         </div>
@@ -548,26 +550,26 @@ export default function NotificationsCenterPage() {
           </SheetHeader>
           {selectedNotification ? (
             <div className="space-y-4 px-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Title</p>
-                <p className="mt-1 text-sm font-medium text-slate-900">
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Title</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
                   {selectedNotification.title}
                 </p>
               </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Description</p>
-                <p className="mt-1 text-sm text-slate-700">
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Description</p>
+                <p className="mt-1 text-sm text-foreground">
                   {selectedDescription || "No additional context provided."}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-lg border border-slate-200 p-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Type</p>
-                  <p className="mt-1 text-slate-900">{selectedNotification.type}</p>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Type</p>
+                  <p className="mt-1 text-foreground">{selectedNotification.type}</p>
                 </div>
-                <div className="rounded-lg border border-slate-200 p-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Created</p>
-                  <p className="mt-1 text-slate-900">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Created</p>
+                  <p className="mt-1 text-foreground">
                     {getRelativeTime(selectedNotification.created_at)}
                   </p>
                 </div>
@@ -599,3 +601,4 @@ export default function NotificationsCenterPage() {
     </PageShell>
   );
 }
+

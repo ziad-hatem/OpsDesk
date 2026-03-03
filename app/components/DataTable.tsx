@@ -130,7 +130,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      <div className="sticky top-0 z-10 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="sticky top-0 z-10 rounded-xl border border-border bg-background/90 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {searchKey ? (
             <Input
@@ -139,7 +139,7 @@ export function DataTable<TData, TValue>({
               onChange={(event) =>
                 table.getColumn(searchKey)?.setFilterValue(event.target.value)
               }
-              className="max-w-sm focus:ring-2 focus:ring-slate-900"
+              className="max-w-sm focus:ring-2 focus-visible:ring-ring"
             />
           ) : (
             <div />
@@ -160,7 +160,7 @@ export function DataTable<TData, TValue>({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="focus:ring-2 focus:ring-slate-900">
+                <Button variant="outline" className="focus:ring-2 focus-visible:ring-ring">
                   <Settings2 className="mr-2 h-4 w-4" />
                   View
                 </Button>
@@ -187,7 +187,7 @@ export function DataTable<TData, TValue>({
         </div>
       </div>
 
-      <div className="relative rounded-xl border border-slate-200 bg-white">
+      <div className="relative rounded-xl border border-border bg-background">
         <Table
           containerRef={tableContainerRef}
           containerClassName="rounded-xl"
@@ -195,11 +195,11 @@ export function DataTable<TData, TValue>({
         >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-slate-200">
+              <TableRow key={headerGroup.id} className="border-border">
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="relative sticky top-0 z-[1] h-11 bg-slate-100/90 text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur supports-[backdrop-filter]:bg-slate-100/75"
+                    className="relative sticky top-0 z-[1] h-11 bg-muted/90 text-xs font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-muted/75"
                     style={{ width: header.getSize() }}
                   >
                     {header.isPlaceholder
@@ -213,8 +213,8 @@ export function DataTable<TData, TValue>({
                         className={cn(
                           "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none",
                           header.column.getIsResizing()
-                            ? "bg-slate-400"
-                            : "bg-transparent hover:bg-slate-300",
+                            ? "bg-border"
+                            : "bg-transparent hover:bg-border",
                         )}
                       />
                     ) : null}
@@ -236,7 +236,7 @@ export function DataTable<TData, TValue>({
                       key={cell.id}
                       className={cn(
                         cellPaddingClass,
-                        "align-top !whitespace-normal break-words [overflow-wrap:anywhere] text-slate-700",
+                        "align-top !whitespace-normal break-words [overflow-wrap:anywhere] text-foreground",
                       )}
                       style={{ width: cell.column.getSize() }}
                     >
@@ -255,12 +255,12 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
         {rightScrollGradientVisible ? (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent" />
         ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ChevronsLeftRight className="h-4 w-4" />
           {scrollHint.canScroll ? (
             <span className="md:hidden">Swipe horizontally to see more columns</span>
@@ -271,12 +271,12 @@ export function DataTable<TData, TValue>({
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-600">Rows per page</span>
+            <span className="text-sm text-muted-foreground">Rows per page</span>
             <Select
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[76px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="h-8 w-[76px] focus:ring-2 focus-visible:ring-ring">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent side="top">
@@ -290,7 +290,7 @@ export function DataTable<TData, TValue>({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-600">
+            <span className="text-sm text-muted-foreground">
               Page {table.getState().pagination.pageIndex + 1} of{" "}
               {Math.max(1, table.getPageCount())}
             </span>
@@ -299,7 +299,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="focus:ring-2 focus:ring-slate-900"
+              className="focus:ring-2 focus-visible:ring-ring"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -308,7 +308,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="focus:ring-2 focus:ring-slate-900"
+              className="focus:ring-2 focus-visible:ring-ring"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -318,3 +318,4 @@ export function DataTable<TData, TValue>({
     </div>
   );
 }
+

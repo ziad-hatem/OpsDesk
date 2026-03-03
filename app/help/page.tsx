@@ -224,13 +224,13 @@ export default function HelpPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Help Center</h1>
-          <p className="text-slate-600 mt-1">
+          <h1 className="text-3xl font-semibold text-foreground">Help Center</h1>
+          <p className="text-muted-foreground mt-1">
             Guides, FAQs, and direct support tools for your workspace.
           </p>
         </div>
         <div className="relative w-full lg:w-[420px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-muted-foreground/70 absolute left-3 top-1/2 -translate-y-1/2" />
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -245,15 +245,15 @@ export default function HelpPage() {
           <button
             key={action.href}
             onClick={() => router.push(action.href)}
-            className="text-left rounded-lg border border-slate-200 bg-white p-4 hover:bg-slate-50 transition-colors"
+            className="text-left rounded-lg border border-border bg-background p-4 hover:bg-muted/50 transition-colors"
           >
             <div className="flex items-start gap-3">
-              <div className="rounded-md bg-slate-100 p-2">
-                <action.icon className="h-4 w-4 text-slate-700" />
+              <div className="rounded-md bg-muted p-2">
+                <action.icon className="h-4 w-4 text-foreground" />
               </div>
               <div>
-                <p className="font-medium text-slate-900">{action.title}</p>
-                <p className="text-sm text-slate-600 mt-1">{action.description}</p>
+                <p className="font-medium text-foreground">{action.title}</p>
+                <p className="text-sm text-muted-foreground mt-1">{action.description}</p>
               </div>
             </div>
           </button>
@@ -273,7 +273,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent>
             {filteredFaqs.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-slate-600">
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
                 No FAQ entries match your search.
               </div>
             ) : (
@@ -282,8 +282,8 @@ export default function HelpPage() {
                   <AccordionItem key={faq.id} value={faq.id}>
                     <AccordionTrigger>{faq.question}</AccordionTrigger>
                     <AccordionContent>
-                      <p className="text-slate-700">{faq.answer}</p>
-                      <p className="text-xs text-slate-500 mt-2">
+                      <p className="text-foreground">{faq.answer}</p>
+                      <p className="text-xs text-muted-foreground mt-2">
                         Tags: {faq.tags.join(", ")}
                       </p>
                     </AccordionContent>
@@ -310,7 +310,7 @@ export default function HelpPage() {
                 Select an organization first, then submit a support request.
               </div>
             ) : (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <div className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-foreground">
                 Tickets are created inside your active organization.
               </div>
             )}
@@ -380,3 +380,4 @@ export default function HelpPage() {
     </div>
   );
 }
+

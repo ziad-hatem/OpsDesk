@@ -1,83 +1,87 @@
-"use client";
-import { Suspense, useEffect } from "react";
-import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
-import { Toaster } from "./components/ui/sonner";
+import type { Metadata } from "next";
 import "./globals.css";
-import { AppProviders } from "./providers";
-import { usePathname, useRouter } from "next/navigation";
-import { Topbar } from "./components/Topbar";
-import { useSession } from "next-auth/react";
-import { AppSidebar } from "./components/AppSidebar";
+import { RootLayoutShell } from "./layout-shell";
 
-const PUBLIC_AUTH_ROUTES = new Set([
-  "/login",
-  "/register",
-  "/verify",
-  "/forgot-password",
-  "/reset-password",
-  "/auth/magic-link",
-  "/payment/thank-you",
-]);
+const APP_NAME = "OpsDesk";
+const APP_DESCRIPTION =
+  "OpsDesk is an enterprise support operations platform that unifies tickets, orders, incidents, and customer communication in one workspace with SLA visibility and automation.";
 
-function LayoutShell({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { status } = useSession();
+function resolveMetadataBase() {
+  const fallbackUrl = "http://localhost:3000";
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? fallbackUrl;
 
-  const isPublicAuthRoute = pathname
-    ? PUBLIC_AUTH_ROUTES.has(pathname)
-    : false;
-  const isInviteRoute = pathname ? pathname.startsWith("/invite/") : false;
-  const isPortalRoute = pathname ? pathname.startsWith("/portal") : false;
-  const isPublicStatusRoute = pathname ? pathname.startsWith("/status/") : false;
-  const isPublicRoute =
-    isPublicAuthRoute || isInviteRoute || isPortalRoute || isPublicStatusRoute;
-
-  useEffect(() => {
-    if (status === "loading") {
-      return;
-    }
-
-    if (!isPublicRoute && status === "unauthenticated") {
-      router.replace("/login");
-      return;
-    }
-
-    if (isPublicAuthRoute && status === "authenticated") {
-      router.replace("/");
-    }
-  }, [isPublicAuthRoute, isPublicRoute, router, status]);
-
-  if (!isPublicRoute && status !== "authenticated") {
-    return null;
+  try {
+    return new URL(configuredUrl);
+  } catch {
+    return new URL(fallbackUrl);
   }
-
-  if (isPublicRoute) {
-    return (
-      <main className="flex-1 overflow-auto">
-        {children}
-        <Toaster />
-      </main>
-    );
-  }
-
-  return (
-    <SidebarProvider defaultOpen>
-      <AppSidebar />
-      <SidebarInset className="overflow-hidden">
-        <Topbar />
-        <main className="workspace-main flex-1 overflow-auto">
-          {children}
-          <Toaster />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
-  );
 }
+
+export const metadata: Metadata = {
+  metadataBase: resolveMetadataBase(),
+  applicationName: APP_NAME,
+  title: {
+    default: `${APP_NAME} | Support Operations Console`,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
+  keywords: [
+    "support operations",
+    "help desk",
+    "customer support",
+    "incident management",
+    "ticketing system",
+    "opsdesk",
+  ],
+  referrer: "origin-when-cross-origin",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    siteName: APP_NAME,
+    title: `${APP_NAME} | Support Operations Console`,
+    description: APP_DESCRIPTION,
+    images: [
+      {
+        url: "/og-image.webp",
+        width: 1200,
+        height: 630,
+        alt: "OpsDesk support operations workspace",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${APP_NAME} | Support Operations Console`,
+    description: APP_DESCRIPTION,
+    images: ["/og-image.webp"],
+  },
+  icons: {
+    icon: [
+      { url: "/favicon_io/favicon.ico", type: "image/x-icon" },
+      { url: "/favicon_io/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon_io/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/favicon_io/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon_io/favicon.ico"],
+  },
+  manifest: "/favicon_io/site.webmanifest",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
 
 export default function RootLayout({
   children,
@@ -85,13 +89,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="flex h-screen bg-slate-50">
-        <AppProviders>
-          <Suspense>
-            <LayoutShell>{children}</LayoutShell>
-          </Suspense>
-        </AppProviders>
+    <html lang="en" suppressHydrationWarning>
+      <body className="flex h-screen bg-background text-foreground">
+        <RootLayoutShell>{children}</RootLayoutShell>
       </body>
     </html>
   );

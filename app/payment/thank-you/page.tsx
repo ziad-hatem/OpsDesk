@@ -25,7 +25,7 @@ export default async function PaymentThankYouPage({ searchParams }: ThankYouPage
   const orderId = displayValue(params.order_id);
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
       <Card className="w-full max-w-xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
@@ -37,13 +37,13 @@ export default async function PaymentThankYouPage({ searchParams }: ThankYouPage
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-md border border-slate-200 bg-white p-4 text-sm">
-            <p className="text-slate-600">Order Number</p>
-            <p className="font-medium text-slate-900 break-all">{orderNumber}</p>
-            <p className="mt-3 text-slate-600">Order ID</p>
-            <p className="font-medium text-slate-900 break-all">{orderId}</p>
-            <p className="mt-3 text-slate-600">Session ID</p>
-            <p className="font-medium text-slate-900 break-all">{sessionId}</p>
+          <div className="rounded-md border border-border bg-background p-4 text-sm">
+            <p className="text-muted-foreground">Order Number</p>
+            <p className="font-medium text-foreground break-all">{orderNumber}</p>
+            <p className="mt-3 text-muted-foreground">Order ID</p>
+            <p className="font-medium text-foreground break-all">{orderId}</p>
+            <p className="mt-3 text-muted-foreground">Session ID</p>
+            <p className="font-medium text-foreground break-all">{sessionId}</p>
           </div>
 
           <div className="flex justify-center">
@@ -56,3 +56,4 @@ export default async function PaymentThankYouPage({ searchParams }: ThankYouPage
     </main>
   );
 }
+

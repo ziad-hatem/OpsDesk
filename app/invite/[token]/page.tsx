@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
@@ -188,14 +189,21 @@ export default function InviteTokenPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-10">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4 py-10">
       <div className="w-full max-w-md space-y-6">
         <div className="flex justify-center">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center">
-              <span className="font-bold text-white text-xl">OD</span>
+            <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-border bg-background">
+              <Image
+                src="/logo.webp"
+                alt="OpsDesk logo"
+                fill
+                className="object-cover"
+                sizes="48px"
+                priority
+              />
             </div>
-            <span className="text-2xl font-semibold text-slate-900">OpsDesk</span>
+            <span className="text-2xl font-semibold text-foreground">OpsDesk</span>
           </div>
         </div>
 
@@ -208,7 +216,7 @@ export default function InviteTokenPage() {
           </CardHeader>
           <CardContent>
             {loadingInvite ? (
-              <div className="py-10 text-center text-slate-600">
+              <div className="py-10 text-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 mx-auto mb-3 animate-spin" />
                 Validating invite...
               </div>
@@ -242,7 +250,7 @@ export default function InviteTokenPage() {
                       <Label>Role</Label>
                       <Input value={inviteInfo.roleLabel} readOnly />
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted-foreground">
                       Expires at: {formatDateTime(inviteInfo.expiresAt)}
                     </div>
 
@@ -312,7 +320,7 @@ export default function InviteTokenPage() {
                     </Button>
                   </>
                 ) : (
-                  <div className="text-sm text-slate-600">
+                  <div className="text-sm text-muted-foreground">
                     This invite is invalid or expired.
                   </div>
                 )}

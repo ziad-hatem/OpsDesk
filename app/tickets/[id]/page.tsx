@@ -110,7 +110,7 @@ function getTextTypeBadge(type: TicketTextType) {
     case "system":
       return {
         label: "System",
-        className: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+        className: "bg-muted text-foreground hover:bg-muted",
       };
     case "comment":
     default:
@@ -491,7 +491,7 @@ export default function TicketDetailPage() {
     return (
       <div className="p-6">
         <Card>
-          <CardContent className="flex items-center justify-center py-12 text-slate-500">
+          <CardContent className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading ticket...
           </CardContent>
@@ -508,7 +508,7 @@ export default function TicketDetailPage() {
           Back to Tickets
         </Button>
         <Card>
-          <CardContent className="py-10 text-center text-slate-600">
+          <CardContent className="py-10 text-center text-muted-foreground">
             {detailEntry.error ?? "Ticket not found or you do not have access to it."}
           </CardContent>
         </Card>
@@ -523,18 +523,18 @@ export default function TicketDetailPage() {
           variant="outline"
           size="icon"
           onClick={() => router.push("/tickets")}
-          className="focus:ring-2 focus:ring-slate-900"
+          className="focus:ring-2 focus:ring-ring"
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
 
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-semibold text-slate-900">Ticket {ticket.id.slice(0, 8).toUpperCase()}</h1>
+            <h1 className="text-3xl font-semibold text-foreground">Ticket {ticket.id.slice(0, 8).toUpperCase()}</h1>
             <StatusBadge status={ticket.status} />
             <StatusBadge status={ticket.priority} />
           </div>
-          <p className="text-slate-700 mt-1">{ticket.title}</p>
+          <p className="text-foreground mt-1">{ticket.title}</p>
         </div>
       </div>
 
@@ -546,7 +546,7 @@ export default function TicketDetailPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {texts.length === 0 ? (
-                <div className="text-sm text-slate-500">No messages yet.</div>
+                <div className="text-sm text-muted-foreground">No messages yet.</div>
               ) : (
                 <div className="space-y-6">
                   {texts.map((text) => {
@@ -563,24 +563,24 @@ export default function TicketDetailPage() {
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <span className="font-medium text-slate-900">{authorName}</span>
+                            <span className="font-medium text-foreground">{authorName}</span>
                             <Badge className={typeBadge.className}>{typeBadge.label}</Badge>
-                            <span className="text-xs text-slate-500">{formatDateTime(text.created_at)}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(text.created_at)}</span>
                           </div>
-                          <p className="text-slate-700 whitespace-pre-wrap">{text.body}</p>
+                          <p className="text-foreground whitespace-pre-wrap">{text.body}</p>
 
                           {text.attachments.length > 0 && (
                             <div className="mt-3 space-y-2">
                               {text.attachments.map((attachment) => (
                                 <div
                                   key={attachment.id}
-                                  className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"
+                                  className="flex items-center justify-between rounded-md border border-border px-3 py-2"
                                 >
                                   <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium text-slate-900">
+                                    <p className="truncate text-sm font-medium text-foreground">
                                       {attachment.file_name}
                                     </p>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-muted-foreground">
                                       {formatBytes(attachment.file_size)}
                                     </p>
                                   </div>
@@ -615,10 +615,10 @@ export default function TicketDetailPage() {
                 </div>
               )}
 
-              <div className="border-t border-slate-200 pt-6 space-y-4">
+              <div className="border-t border-border pt-6 space-y-4">
                 <div className="flex flex-wrap gap-3">
                   <div className="w-[180px]">
-                    <Label className="mb-2 block text-sm text-slate-600">Message type</Label>
+                    <Label className="mb-2 block text-sm text-muted-foreground">Message type</Label>
                     <Select
                       value={replyType}
                       onValueChange={(value) =>
@@ -643,17 +643,17 @@ export default function TicketDetailPage() {
                   className="min-h-[120px]"
                 />
                 {activeMentionQuery !== null ? (
-                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p className="text-xs font-medium text-slate-700">
+                  <div className="rounded-md border border-border bg-muted/50 px-3 py-2">
+                    <p className="text-xs font-medium text-foreground">
                       Mention handles on this ticket
                     </p>
                     {mentionSuggestions.length === 0 ? (
-                      <p className="mt-1 text-xs text-slate-500">No matching handles found.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">No matching handles found.</p>
                     ) : (
                       <div className="mt-2 space-y-2">
                         {mentionSuggestions.map((entry) => (
                           <div key={entry.user.id} className="space-y-1">
-                            <p className="text-xs text-slate-600">
+                            <p className="text-xs text-muted-foreground">
                               {formatUserDisplay(entry.user)}
                             </p>
                             <div className="flex flex-wrap gap-1.5">
@@ -662,7 +662,7 @@ export default function TicketDetailPage() {
                                   key={`${entry.user.id}-${handle}`}
                                   type="button"
                                   onClick={() => handleInsertMention(handle)}
-                                  className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-700 hover:bg-slate-100"
+                                  className="rounded-full border border-border bg-background px-2 py-0.5 text-xs text-foreground hover:bg-muted"
                                 >
                                   @{handle}
                                 </button>
@@ -680,11 +680,11 @@ export default function TicketDetailPage() {
                     {selectedFiles.map((file, index) => (
                       <div
                         key={`${file.name}-${file.lastModified}-${index}`}
-                        className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"
+                        className="flex items-center justify-between rounded-md border border-border px-3 py-2"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">{file.name}</p>
-                          <p className="text-xs text-slate-500">{formatBytes(file.size)}</p>
+                          <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
                         </div>
                         <Button
                           variant="ghost"
@@ -746,21 +746,21 @@ export default function TicketDetailPage() {
             </CardHeader>
             <CardContent>
               {attachments.length === 0 ? (
-                <p className="text-sm text-slate-500">No attachments uploaded yet.</p>
+                <p className="text-sm text-muted-foreground">No attachments uploaded yet.</p>
               ) : (
                 <div className="space-y-2">
                   {attachments.map((attachment) => (
                     <div
                       key={attachment.id}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3 hover:bg-slate-50"
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-3 hover:bg-muted/50"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="rounded bg-slate-100 p-2">
-                          <Paperclip className="h-4 w-4 text-slate-600" />
+                        <div className="rounded bg-muted p-2">
+                          <Paperclip className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{attachment.file_name}</p>
-                          <p className="text-xs text-slate-600">
+                          <p className="truncate font-medium text-foreground">{attachment.file_name}</p>
+                          <p className="text-xs text-muted-foreground">
                             {formatBytes(attachment.file_size)} - Uploaded by{" "}
                             {formatUserDisplay(attachment.uploader)} on{" "}
                             {formatDateTime(attachment.created_at)}
@@ -799,7 +799,7 @@ export default function TicketDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label className="text-sm text-slate-600 mb-2 block">Status</Label>
+                <Label className="text-sm text-muted-foreground mb-2 block">Status</Label>
                 <Select
                   value={ticket.status}
                   onValueChange={(value) =>
@@ -823,7 +823,7 @@ export default function TicketDetailPage() {
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-2 block">Priority</Label>
+                <Label className="text-sm text-muted-foreground mb-2 block">Priority</Label>
                 <Select
                   value={ticket.priority}
                   onValueChange={(value) =>
@@ -847,7 +847,7 @@ export default function TicketDetailPage() {
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-2 block">Assignee</Label>
+                <Label className="text-sm text-muted-foreground mb-2 block">Assignee</Label>
                 <Select
                   value={ticket.assignee_id ?? "unassigned"}
                   onValueChange={(value) =>
@@ -873,7 +873,7 @@ export default function TicketDetailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-slate-600">SLA Due Date</Label>
+                <Label className="text-sm text-muted-foreground">SLA Due Date</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="datetime-local"
@@ -896,37 +896,37 @@ export default function TicketDetailPage() {
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Created By</Label>
-                <p className="font-medium text-slate-900">{formatUserDisplay(ticket.creator)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Created By</Label>
+                <p className="font-medium text-foreground">{formatUserDisplay(ticket.creator)}</p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Customer</Label>
+                <Label className="text-sm text-muted-foreground mb-1 block">Customer</Label>
                 {ticket.customer ? (
                   <button
                     onClick={() => router.push(`/customers/${ticket.customer?.id}`)}
-                    className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+                    className="font-medium text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
                   >
                     {ticket.customer.name}
                   </button>
                 ) : (
-                  <p className="font-medium text-slate-400">Not linked</p>
+                  <p className="font-medium text-muted-foreground/70">Not linked</p>
                 )}
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Created At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(ticket.created_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Created At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(ticket.created_at)}</p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Last Updated</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(ticket.updated_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Last Updated</Label>
+                <p className="font-medium text-foreground">{formatDateTime(ticket.updated_at)}</p>
               </div>
 
               <div>
-                <Label className="text-sm text-slate-600 mb-1 block">Closed At</Label>
-                <p className="font-medium text-slate-900">{formatDateTime(ticket.closed_at)}</p>
+                <Label className="text-sm text-muted-foreground mb-1 block">Closed At</Label>
+                <p className="font-medium text-foreground">{formatDateTime(ticket.closed_at)}</p>
               </div>
             </CardContent>
           </Card>
@@ -937,15 +937,15 @@ export default function TicketDetailPage() {
             </CardHeader>
             <CardContent>
               {systemActivity.length === 0 ? (
-                <p className="text-sm text-slate-500">No system activity yet.</p>
+                <p className="text-sm text-muted-foreground">No system activity yet.</p>
               ) : (
                 <div className="space-y-4">
                   {systemActivity.map((item) => (
                     <div key={item.id} className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full bg-slate-400 mt-2" />
+                      <div className="w-2 h-2 rounded-full bg-border mt-2" />
                       <div className="flex-1">
-                        <p className="text-sm text-slate-900">{item.body}</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="text-sm text-foreground">{item.body}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {formatDateTime(item.created_at)} by {formatUserDisplay(item.author)}
                         </p>
                       </div>

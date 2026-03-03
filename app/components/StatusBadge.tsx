@@ -14,7 +14,7 @@ type BadgeTone = {
 const BADGE_CONFIG: Record<string, BadgeTone> = {
   // Common statuses
   active: { label: "Active", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
-  inactive: { label: "Inactive", className: "bg-slate-100 text-slate-700 hover:bg-slate-100" },
+  inactive: { label: "Inactive", className: "bg-muted text-foreground hover:bg-muted" },
   suspended: { label: "Suspended", className: "bg-rose-100 text-rose-800 hover:bg-rose-100" },
   blocked: { label: "Blocked", className: "bg-red-100 text-red-800 hover:bg-red-100" },
 
@@ -23,7 +23,7 @@ const BADGE_CONFIG: Record<string, BadgeTone> = {
   pending: { label: "Pending", className: "bg-amber-100 text-amber-800 hover:bg-amber-100" },
   in_progress: { label: "In Progress", className: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100" },
   resolved: { label: "Resolved", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
-  closed: { label: "Closed", className: "bg-slate-100 text-slate-700 hover:bg-slate-100" },
+  closed: { label: "Closed", className: "bg-muted text-foreground hover:bg-muted" },
 
   // Incident statuses
   investigating: { label: "Investigating", className: "bg-red-100 text-red-800 hover:bg-red-100" },
@@ -34,10 +34,10 @@ const BADGE_CONFIG: Record<string, BadgeTone> = {
   urgent: { label: "Urgent", className: "bg-red-100 text-red-800 hover:bg-red-100" },
   high: { label: "High", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
   medium: { label: "Medium", className: "bg-amber-100 text-amber-800 hover:bg-amber-100" },
-  low: { label: "Low", className: "bg-slate-100 text-slate-700 hover:bg-slate-100" },
+  low: { label: "Low", className: "bg-muted text-foreground hover:bg-muted" },
 
   // Order / payment statuses
-  draft: { label: "Draft", className: "bg-slate-100 text-slate-700 hover:bg-slate-100" },
+  draft: { label: "Draft", className: "bg-muted text-foreground hover:bg-muted" },
   unpaid: { label: "Unpaid", className: "bg-orange-100 text-orange-800 hover:bg-orange-100" },
   payment_link_sent: { label: "Link Sent", className: "bg-cyan-100 text-cyan-800 hover:bg-cyan-100" },
   paid: { label: "Paid", className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" },
@@ -72,7 +72,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   const key = normalizeKey(status);
   const config = BADGE_CONFIG[key] ?? {
     label: toLabel(key),
-    className: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+    className: "bg-muted text-foreground hover:bg-muted",
   };
 
   return (
@@ -81,4 +81,5 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     </Badge>
   );
 }
+
 

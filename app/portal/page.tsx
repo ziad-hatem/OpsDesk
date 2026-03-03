@@ -264,12 +264,12 @@ export default function CustomerPortalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-muted px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-7xl space-y-6">
         <Card>
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-2xl text-slate-900">Customer Portal</CardTitle>
+              <CardTitle className="text-2xl text-foreground">Customer Portal</CardTitle>
               <CardDescription>
                 Track your tickets, share updates, and pay related orders in one place.
               </CardDescription>
@@ -296,8 +296,8 @@ export default function CustomerPortalPage() {
             </div>
           </CardHeader>
           {overview ? (
-            <CardContent className="pt-0 text-sm text-slate-600">
-              Signed in as <span className="font-medium text-slate-900">{overview.customer.name}</span>
+            <CardContent className="pt-0 text-sm text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{overview.customer.name}</span>
               {" • "}
               {overview.customer.email ?? "No email"}
             </CardContent>
@@ -306,7 +306,7 @@ export default function CustomerPortalPage() {
 
         {isOverviewLoading ? (
           <Card>
-            <CardContent className="flex items-center gap-2 py-10 text-slate-600">
+            <CardContent className="flex items-center gap-2 py-10 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading portal data...
             </CardContent>
@@ -343,7 +343,7 @@ export default function CustomerPortalPage() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {overview.tickets.length === 0 ? (
-                    <p className="text-sm text-slate-500">No tickets found.</p>
+                    <p className="text-sm text-muted-foreground">No tickets found.</p>
                   ) : (
                     overview.tickets.map((ticket) => (
                       <button
@@ -352,18 +352,18 @@ export default function CustomerPortalPage() {
                         onClick={() => setSelectedTicketId(ticket.id)}
                         className={`w-full rounded-md border p-3 text-left transition ${
                           selectedTicketId === ticket.id
-                            ? "border-slate-900 bg-slate-50"
-                            : "border-slate-200 hover:border-slate-300"
+                            ? "border-primary bg-muted/50"
+                            : "border-border hover:border-border"
                         }`}
                       >
-                        <p className="truncate text-sm font-medium text-slate-900">{ticket.title}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{ticket.title}</p>
                         <div className="mt-2 flex items-center gap-2">
                           <Badge variant={badgeVariantForTicketStatus(ticket.status)}>
                             {ticket.status}
                           </Badge>
                           <Badge variant="outline">{ticket.priority}</Badge>
                         </div>
-                        <p className="mt-2 text-xs text-slate-500">
+                        <p className="mt-2 text-xs text-muted-foreground">
                           Updated {formatDateTime(ticket.updated_at)}
                         </p>
                       </button>
@@ -385,13 +385,13 @@ export default function CustomerPortalPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {selectedTicket && selectedTicket.description ? (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    <div className="rounded-md border border-border bg-muted/50 p-3 text-sm text-foreground">
                       {selectedTicket.description}
                     </div>
                   ) : null}
 
                   {isTicketLoading ? (
-                    <p className="flex items-center gap-2 text-sm text-slate-600">
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading ticket detail...
                     </p>
@@ -405,23 +405,23 @@ export default function CustomerPortalPage() {
 
                   {selectedTicketDetail ? (
                     <>
-                      <div className="space-y-3 rounded-md border border-slate-200 p-3">
+                      <div className="space-y-3 rounded-md border border-border p-3">
                         {selectedTicketDetail.texts.length === 0 ? (
-                          <p className="text-sm text-slate-500">No messages yet.</p>
+                          <p className="text-sm text-muted-foreground">No messages yet.</p>
                         ) : (
                           selectedTicketDetail.texts.map((text) => (
-                            <div key={text.id} className="rounded-md border border-slate-200 p-3">
-                              <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-500">
+                            <div key={text.id} className="rounded-md border border-border p-3">
+                              <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <span>{text.author?.name ?? text.author?.email ?? "Unknown"}</span>
                                 <span>{formatDateTime(text.created_at)}</span>
                               </div>
-                              <p className="whitespace-pre-wrap text-sm text-slate-800">{text.body}</p>
+                              <p className="whitespace-pre-wrap text-sm text-foreground">{text.body}</p>
                               {text.attachments.length > 0 ? (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {text.attachments.map((attachment) => (
                                     <a
                                       key={attachment.id}
-                                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                                      className="rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted/50"
                                       href={`/api/portal/tickets/${selectedTicketDetail.ticket.id}/attachments/${attachment.id}`}
                                       target="_blank"
                                       rel="noreferrer"
@@ -444,7 +444,7 @@ export default function CustomerPortalPage() {
                           rows={4}
                           disabled={isPostingReply}
                         />
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           Mention a support teammate with{" "}
                           <span className="font-medium">@handle</span>.
                         </p>
@@ -462,8 +462,8 @@ export default function CustomerPortalPage() {
                         </div>
                       </form>
 
-                      <div className="space-y-2 rounded-md border border-slate-200 p-3">
-                        <p className="text-sm font-medium text-slate-800">Upload attachment</p>
+                      <div className="space-y-2 rounded-md border border-border p-3">
+                        <p className="text-sm font-medium text-foreground">Upload attachment</p>
                         <div className="flex flex-col gap-2 sm:flex-row">
                           <Input
                             type="file"
@@ -489,14 +489,14 @@ export default function CustomerPortalPage() {
                           </Button>
                         </div>
                         {selectedFile ? (
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-muted-foreground">
                             Selected: {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
                           </p>
                         ) : null}
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       Select a ticket to view conversation and attachments.
                     </p>
                   )}
@@ -512,7 +512,7 @@ export default function CustomerPortalPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {overview.orders.length === 0 ? (
-                    <p className="text-sm text-slate-500">No orders found.</p>
+                    <p className="text-sm text-muted-foreground">No orders found.</p>
                   ) : (
                     overview.orders.map((order) => {
                       const canPay =
@@ -522,17 +522,17 @@ export default function CustomerPortalPage() {
                       return (
                         <div
                           key={order.id}
-                          className="flex flex-col gap-3 rounded-md border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-3 rounded-md border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="space-y-1">
-                            <p className="font-medium text-slate-900">Order {order.order_number}</p>
+                            <p className="font-medium text-foreground">Order {order.order_number}</p>
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="outline">{order.status}</Badge>
                               <Badge variant={badgeVariantForPaymentStatus(order.payment_status)}>
                                 {order.payment_status}
                               </Badge>
                             </div>
-                            <p className="text-sm text-slate-600">
+                            <p className="text-sm text-muted-foreground">
                               {formatMoney(order.total_amount, order.currency)} • Created{" "}
                               {formatDateTime(order.created_at)}
                             </p>
@@ -574,3 +574,4 @@ export default function CustomerPortalPage() {
     </div>
   );
 }
+

@@ -272,7 +272,7 @@ export default function SettingsSla() {
               </div>
               <div className="space-y-2">
                 <Label>Auto Escalate</Label>
-                <div className="flex h-10 items-center rounded-md border border-slate-200 px-3">
+                <div className="flex h-10 items-center rounded-md border border-border px-3">
                   <Switch
                     checked={policy.auto_escalate}
                     onCheckedChange={(checked) =>
@@ -285,7 +285,7 @@ export default function SettingsSla() {
                       )
                     }
                   />
-                  <span className="ml-3 text-sm text-slate-600">
+                  <span className="ml-3 text-sm text-muted-foreground">
                     Reassign breached tickets to escalation role
                   </span>
                 </div>
@@ -302,7 +302,7 @@ export default function SettingsSla() {
       <div className="p-6 space-y-4">
         <SettingsNav />
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to manage SLA policies.
           </CardContent>
         </Card>
@@ -315,8 +315,8 @@ export default function SettingsSla() {
       <SettingsNav />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">SLA & Escalation</h1>
-          <p className="text-slate-600 mt-1">
+          <h1 className="text-3xl font-semibold text-foreground">SLA & Escalation</h1>
+          <p className="text-muted-foreground mt-1">
             Configure per-priority first-response and resolution timers with auto-escalation.
           </p>
         </div>
@@ -354,7 +354,7 @@ export default function SettingsSla() {
 
       {lastRunResult && (
         <Card>
-          <CardContent className="p-4 text-sm text-slate-700">
+          <CardContent className="p-4 text-sm text-foreground">
             Last run: scanned {lastRunResult.scanned} tickets, created {lastRunResult.warningsCreated} warnings,{" "}
             {lastRunResult.breachesCreated} breaches, {lastRunResult.autoEscalations} auto-escalations.
           </CardContent>
@@ -363,7 +363,7 @@ export default function SettingsSla() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="p-10 text-center text-slate-500">
+          <CardContent className="p-10 text-center text-muted-foreground">
             <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
             Loading SLA policies...
           </CardContent>
@@ -374,3 +374,4 @@ export default function SettingsSla() {
     </div>
   );
 }
+

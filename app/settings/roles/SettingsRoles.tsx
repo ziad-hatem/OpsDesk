@@ -645,7 +645,7 @@ export default function SettingsRoles() {
       <div className="space-y-4 p-6">
         <SettingsNav />
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to manage RBAC and approvals.
           </CardContent>
         </Card>
@@ -658,7 +658,7 @@ export default function SettingsRoles() {
       <div className="space-y-4 p-6">
         <SettingsNav />
         <Card>
-          <CardContent className="flex items-center gap-2 p-6 text-slate-600">
+          <CardContent className="flex items-center gap-2 p-6 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading RBAC settings...
           </CardContent>
@@ -672,7 +672,7 @@ export default function SettingsRoles() {
       <div className="space-y-4 p-6">
         <SettingsNav />
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Failed to load RBAC settings for this organization.
           </CardContent>
         </Card>
@@ -686,8 +686,8 @@ export default function SettingsRoles() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Custom RBAC & Approvals</h1>
-          <p className="mt-1 text-slate-600">
+          <h1 className="text-3xl font-semibold text-foreground">Custom RBAC & Approvals</h1>
+          <p className="mt-1 text-muted-foreground">
             Configure per-action permissions and enforce approval flow for risky operations.
           </p>
         </div>
@@ -711,26 +711,26 @@ export default function SettingsRoles() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Custom Roles</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{roleData.roles.length}</p>
+            <p className="text-xs text-muted-foreground">Custom Roles</p>
+            <p className="mt-1 text-2xl font-semibold text-foreground">{roleData.roles.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Members with Custom Role</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{customRoleMembersCount}</p>
+            <p className="text-xs text-muted-foreground">Members with Custom Role</p>
+            <p className="mt-1 text-2xl font-semibold text-foreground">{customRoleMembersCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Enabled Approval Policies</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{enabledPoliciesCount}</p>
+            <p className="text-xs text-muted-foreground">Enabled Approval Policies</p>
+            <p className="mt-1 text-2xl font-semibold text-foreground">{enabledPoliciesCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-slate-500">Pending Inbox Requests</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{approvalInbox.length}</p>
+            <p className="text-xs text-muted-foreground">Pending Inbox Requests</p>
+            <p className="mt-1 text-2xl font-semibold text-foreground">{approvalInbox.length}</p>
           </CardContent>
         </Card>
       </div>
@@ -763,7 +763,7 @@ export default function SettingsRoles() {
         </CardHeader>
         <CardContent className="space-y-4">
           {roleData.roles.length === 0 ? (
-            <p className="text-sm text-slate-500">No custom roles yet.</p>
+            <p className="text-sm text-muted-foreground">No custom roles yet.</p>
           ) : (
             <Accordion type="multiple" className="w-full">
               {roleData.roles.map((role) => {
@@ -771,10 +771,10 @@ export default function SettingsRoles() {
                   role.permissions.map((permission) => permission.key),
                 );
                 return (
-                  <AccordionItem key={role.id} value={role.id} className="border-slate-200">
+                  <AccordionItem key={role.id} value={role.id} className="border-border">
                     <AccordionTrigger className="hover:no-underline">
                       <div className="flex flex-wrap items-center gap-2 text-left">
-                        <span className="font-medium text-slate-900">{role.name}</span>
+                        <span className="font-medium text-foreground">{role.name}</span>
                         <Badge variant="secondary">{role.memberCount} members</Badge>
                         <Badge variant="outline">{selectedPermissions.size} permissions</Badge>
                       </div>
@@ -819,11 +819,11 @@ export default function SettingsRoles() {
                         {permissionGroups.map((group) => (
                           <div
                             key={`${role.id}-${group.domain}`}
-                            className="rounded-md border border-slate-200 p-3"
+                            className="rounded-md border border-border p-3"
                           >
                             <div className="mb-2 flex items-center gap-2">
                               <Badge variant="outline">{toDomainLabel(group.domain)}</Badge>
-                              <span className="text-xs text-slate-500">
+                              <span className="text-xs text-muted-foreground">
                                 {group.permissions.length} permissions
                               </span>
                             </div>
@@ -831,7 +831,7 @@ export default function SettingsRoles() {
                               {group.permissions.map((permission) => (
                                 <label
                                   key={`${role.id}-${permission.key}`}
-                                  className="flex items-start gap-2 rounded-md border border-slate-200 p-2 text-sm"
+                                  className="flex items-start gap-2 rounded-md border border-border p-2 text-sm"
                                 >
                                   <Checkbox
                                     checked={selectedPermissions.has(permission.key)}
@@ -841,13 +841,13 @@ export default function SettingsRoles() {
                                     }
                                   />
                                   <span>
-                                    <span className="flex items-center gap-2 font-medium text-slate-900">
+                                    <span className="flex items-center gap-2 font-medium text-foreground">
                                       {permission.label}
                                       <Badge variant={toRiskBadgeVariant(permission.risk)}>
                                         {permission.risk}
                                       </Badge>
                                     </span>
-                                    <span className="block text-xs text-slate-500">
+                                    <span className="block text-xs text-muted-foreground">
                                       {permission.description}
                                     </span>
                                   </span>
@@ -875,14 +875,14 @@ export default function SettingsRoles() {
           {roleData.members.map((member) => (
             <div
               key={member.membership_id}
-              className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 md:grid-cols-[1.6fr_1fr_1.2fr]"
+              className="grid grid-cols-1 gap-2 rounded-md border border-border p-3 md:grid-cols-[1.6fr_1fr_1.2fr]"
             >
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-900">{member.name ?? member.email}</p>
-                <p className="truncate text-xs text-slate-500">{member.email}</p>
+                <p className="truncate font-medium text-foreground">{member.name ?? member.email}</p>
+                <p className="truncate text-xs text-muted-foreground">{member.email}</p>
               </div>
-              <div className="text-sm text-slate-600">
-                System: <span className="font-medium text-slate-900">{toRoleLabel(member.system_role)}</span>
+              <div className="text-sm text-muted-foreground">
+                System: <span className="font-medium text-foreground">{toRoleLabel(member.system_role)}</span>
               </div>
               <Select
                 value={member.custom_role_id ?? "none"}
@@ -954,7 +954,7 @@ export default function SettingsRoles() {
           </div>
 
           {filteredPolicies.length === 0 ? (
-            <p className="text-sm text-slate-500">No policies match the selected filters.</p>
+            <p className="text-sm text-muted-foreground">No policies match the selected filters.</p>
           ) : (
             <Accordion type="multiple" className="w-full">
               {filteredPolicies.map((policy) => {
@@ -963,11 +963,11 @@ export default function SettingsRoles() {
                   <AccordionItem
                     key={policy.permission_key}
                     value={policy.permission_key}
-                    className="border-slate-200"
+                    className="border-border"
                   >
                     <AccordionTrigger className="hover:no-underline">
                       <div className="flex flex-wrap items-center gap-2 text-left">
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-foreground">
                           {catalog?.label ?? policy.permission_key}
                         </span>
                         <Badge variant={policy.enabled ? "default" : "outline"}>
@@ -979,11 +979,11 @@ export default function SettingsRoles() {
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="space-y-3">
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         {catalog?.description ?? policy.permission_key}
                       </p>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500">Require approval</span>
+                        <span className="text-xs text-muted-foreground">Require approval</span>
                         <Switch
                           checked={policy.enabled}
                           disabled={!roleData.canManageRbac}
@@ -1013,7 +1013,7 @@ export default function SettingsRoles() {
                         </div>
                         <div className="space-y-1 md:col-span-2">
                           <Label className="text-xs">Approver system roles</Label>
-                          <div className="flex flex-wrap gap-3 rounded-md border border-slate-200 p-2">
+                          <div className="flex flex-wrap gap-3 rounded-md border border-border p-2">
                             {(["admin", "manager", "support", "read_only"] as const).map((role) => (
                               <label
                                 key={`${policy.permission_key}-${role}`}
@@ -1036,7 +1036,7 @@ export default function SettingsRoles() {
                       {roleData.roles.length > 0 ? (
                         <div className="space-y-1">
                           <Label className="text-xs">Approver custom roles</Label>
-                          <div className="flex flex-wrap gap-3 rounded-md border border-slate-200 p-2">
+                          <div className="flex flex-wrap gap-3 rounded-md border border-border p-2">
                             {roleData.roles.map((role) => (
                               <label
                                 key={`${policy.permission_key}-custom-${role.id}`}
@@ -1107,18 +1107,18 @@ export default function SettingsRoles() {
         </CardHeader>
         <CardContent className="space-y-4">
           {approvalInbox.length === 0 ? (
-            <p className="text-sm text-slate-500">No pending approvals in your inbox.</p>
+            <p className="text-sm text-muted-foreground">No pending approvals in your inbox.</p>
           ) : (
             approvalInbox.map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-200 p-3 space-y-3">
+              <div key={request.id} className="rounded-lg border border-border p-3 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="font-medium text-slate-900">{request.action_label}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="font-medium text-foreground">{request.action_label}</p>
+                    <p className="text-xs text-muted-foreground">
                       Requested by {request.requester?.name ?? request.requester?.email ?? request.requested_by} on{" "}
                       {formatDateTime(request.created_at)}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Permission: <code>{request.permission_key}</code>
                     </p>
                   </div>
@@ -1164,14 +1164,14 @@ export default function SettingsRoles() {
         </CardHeader>
         <CardContent className="space-y-3">
           {approvalRequested.length === 0 ? (
-            <p className="text-sm text-slate-500">No approval requests submitted yet.</p>
+            <p className="text-sm text-muted-foreground">No approval requests submitted yet.</p>
           ) : (
             approvalRequested.map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-200 p-3">
+              <div key={request.id} className="rounded-lg border border-border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="font-medium text-slate-900">{request.action_label}</p>
-                    <p className="text-xs text-slate-500">{formatDateTime(request.created_at)}</p>
+                    <p className="font-medium text-foreground">{request.action_label}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(request.created_at)}</p>
                   </div>
                   <Badge variant={toRequestStatusBadgeVariant(request.status)}>
                     {request.status}
@@ -1186,3 +1186,4 @@ export default function SettingsRoles() {
     </div>
   );
 }
+

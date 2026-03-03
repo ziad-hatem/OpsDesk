@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect } from "react";
 import { Provider } from "react-redux";
 import { SessionProvider, useSession } from "next-auth/react";
+import { ThemeProvider } from "next-themes";
 import { store } from "@/lib/store/store";
 import { clearLoggedUser, setLoggedUser } from "@/lib/store/slices/auth-slice";
 import { useAppDispatch } from "@/lib/store/hooks";
@@ -42,10 +43,18 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <Provider store={store}>
       <SessionProvider>
-        <AuthSessionSync />
-        <NotificationRealtimeBridge />
-        <MembershipRealtimeGuard />
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          storageKey="opsdesk-theme"
+        >
+          <AuthSessionSync />
+          <NotificationRealtimeBridge />
+          <MembershipRealtimeGuard />
+          {children}
+        </ThemeProvider>
       </SessionProvider>
     </Provider>
   );

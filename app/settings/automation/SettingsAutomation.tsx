@@ -628,7 +628,7 @@ export default function SettingsAutomation() {
       <div className="p-6 space-y-4">
         <SettingsNav />
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to manage automation rules.
           </CardContent>
         </Card>
@@ -642,8 +642,8 @@ export default function SettingsAutomation() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Workflow Automation</h1>
-          <p className="mt-1 text-slate-600">
+          <h1 className="text-3xl font-semibold text-foreground">Workflow Automation</h1>
+          <p className="mt-1 text-muted-foreground">
             Create if/then rules to auto-assign tickets, notify teams, and keep workflows fast.
           </p>
         </div>
@@ -666,12 +666,12 @@ export default function SettingsAutomation() {
               ))}
             </SelectContent>
           </Select>
-          <div className="flex items-center rounded-md border border-slate-200 px-3 py-2">
+          <div className="flex items-center rounded-md border border-border px-3 py-2">
             <Switch
               checked={showArchived}
               onCheckedChange={setShowArchived}
             />
-            <span className="ml-2 text-sm text-slate-600">Show archived</span>
+            <span className="ml-2 text-sm text-muted-foreground">Show archived</span>
           </div>
           <Button
             variant="outline"
@@ -696,14 +696,14 @@ export default function SettingsAutomation() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="p-10 text-center text-slate-500">
+          <CardContent className="p-10 text-center text-muted-foreground">
             <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
             Loading automation rules...
           </CardContent>
         </Card>
       ) : rules.length === 0 ? (
         <Card>
-          <CardContent className="p-10 text-center text-slate-500">
+          <CardContent className="p-10 text-center text-muted-foreground">
             No rules yet. Add your first automation rule.
           </CardContent>
         </Card>
@@ -836,7 +836,7 @@ export default function SettingsAutomation() {
 
                   <div className="space-y-2">
                     <Label>Enabled</Label>
-                    <div className="flex h-10 items-center rounded-md border border-slate-200 px-3">
+                    <div className="flex h-10 items-center rounded-md border border-border px-3">
                       <Switch
                         checked={rule.isEnabled}
                         onCheckedChange={(checked) =>
@@ -847,7 +847,7 @@ export default function SettingsAutomation() {
                           )
                         }
                       />
-                      <span className="ml-3 text-sm text-slate-600">
+                      <span className="ml-3 text-sm text-muted-foreground">
                         Rule is active
                       </span>
                     </div>
@@ -966,7 +966,7 @@ export default function SettingsAutomation() {
                   ) : (
                     <div className="space-y-2">
                       <Label>Condition: Primary Filter</Label>
-                      <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                      <div className="flex h-10 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
                         Not applicable for this module
                       </div>
                     </div>
@@ -1027,7 +1027,7 @@ export default function SettingsAutomation() {
                   ) : (
                     <div className="space-y-2">
                       <Label>Condition: Assignee</Label>
-                      <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                      <div className="flex h-10 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
                         Not applicable for this module
                       </div>
                     </div>
@@ -1065,7 +1065,7 @@ export default function SettingsAutomation() {
                   ) : (
                     <div className="space-y-2">
                       <Label>Action: Assign Role</Label>
-                      <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                      <div className="flex h-10 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
                         Not applicable for this module
                       </div>
                     </div>
@@ -1101,7 +1101,7 @@ export default function SettingsAutomation() {
                   {rule.entityType === "portal" ? (
                     <div className="space-y-2">
                       <Label>Action: Set Status</Label>
-                      <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                      <div className="flex h-10 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
                         Not applicable for portal events
                       </div>
                     </div>
@@ -1233,7 +1233,7 @@ export default function SettingsAutomation() {
                     ) : (
                       <>
                         <Label>Action: Secondary Action</Label>
-                        <div className="flex h-10 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-500">
+                        <div className="flex h-10 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
                           Not applicable for this module
                         </div>
                       </>
@@ -1257,7 +1257,7 @@ export default function SettingsAutomation() {
                         )
                       }
                     />
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Supports: {"{{title}}"}, {"{{ruleName}}"}, {"{{status}}"}, {"{{severity}}"}, {"{{priority}}"}, {"{{paymentStatus}}"}, {"{{ticketId}}"}, {"{{orderId}}"}, {"{{customerId}}"}, {"{{incidentId}}"}, {"{{entityType}}"}, {"{{entityId}}"}, {"{{eventName}}"}, {"{{email}}"}.
                     </p>
                   </div>
@@ -1313,7 +1313,7 @@ export default function SettingsAutomation() {
             <AlertDialogTitle>Delete automation rule?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete{" "}
-              <span className="font-medium text-slate-900">
+              <span className="font-medium text-foreground">
                 {deleteTargetRule?.name ?? "this rule"}
               </span>
               . This action cannot be undone.
@@ -1344,3 +1344,4 @@ export default function SettingsAutomation() {
     </div>
   );
 }
+

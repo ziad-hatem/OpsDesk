@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import Image from "next/image";
 import {
   BarChart3,
   ArrowUpDown,
@@ -22,6 +23,7 @@ import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Button } from "./ui/button";
+import { ThemeToggle } from "./ThemeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -138,20 +140,20 @@ function isRecentSearchItem(value: unknown): value is RecentSearchItem {
 
 function SearchResultIcon({ type }: { type: GlobalSearchItemType }) {
   if (type === "ticket") {
-    return <Ticket className="h-4 w-4 text-slate-500" />;
+    return <Ticket className="h-4 w-4 text-muted-foreground" />;
   }
   if (type === "customer") {
-    return <UserRound className="h-4 w-4 text-slate-500" />;
+    return <UserRound className="h-4 w-4 text-muted-foreground" />;
   }
   if (type === "order") {
-    return <ShoppingCart className="h-4 w-4 text-slate-500" />;
+    return <ShoppingCart className="h-4 w-4 text-muted-foreground" />;
   }
-  return <Users className="h-4 w-4 text-slate-500" />;
+  return <Users className="h-4 w-4 text-muted-foreground" />;
 }
 
 function SearchKbd({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex min-w-5 items-center justify-center rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-600 shadow-sm">
+    <kbd className="inline-flex min-w-5 items-center justify-center rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground shadow-sm">
       {children}
     </kbd>
   );
@@ -170,19 +172,19 @@ function SearchResultCommandItem({
     <CommandItem
       value={`${item.type}-${item.id}-${item.title}`}
       onSelect={() => onSelect(item)}
-      className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
+      className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-border data-[selected=true]:bg-muted"
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
         <SearchResultIcon type={item.type} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="truncate font-medium text-slate-900">{item.title}</p>
+          <p className="truncate font-medium text-foreground">{item.title}</p>
           <Badge variant="outline" className="h-5 rounded-full text-[10px]">
             {shortcutLabel}
           </Badge>
         </div>
-        <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
+        <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
       </div>
       <CommandShortcut>{getRelativeSearchTime(item.createdAt)}</CommandShortcut>
     </CommandItem>
@@ -245,8 +247,10 @@ export function Topbar() {
   const userAvatarUrl = topbarData?.user.avatar_url ?? null;
   const canCreateOrganizations =
     topbarData?.organizationCreation.canCreateFromScratch ?? true;
-  const userInitials =
-    userEmail || userName ? getInitials(userName, userEmail || "user@local") : "OD";
+  const hasUserIdentity = Boolean(userEmail || userName);
+  const userInitials = hasUserIdentity
+    ? getInitials(userName, userEmail || "user@local")
+    : "";
   const isTopbarLoading = topbarStatus === "loading" && !topbarData;
 
   const handleOrganizationSwitch = async (organizationId: string) => {
@@ -534,14 +538,14 @@ export function Topbar() {
 
   return (
     <>
-      <header className="flex items-center justify-between h-16 px-6 bg-white border-b border-slate-200">
+      <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="gap-2 min-w-[220px] justify-between focus:ring-2 focus:ring-slate-900"
+                className="min-w-[220px] justify-between gap-2"
                 disabled={isTopbarLoading}
               >
                 <span className="font-medium truncate max-w-[150px]">
@@ -550,9 +554,9 @@ export function Topbar() {
                     : activeOrganization?.name ?? "Select organization"}
                 </span>
                 {isSwitchingOrganization ? (
-                  <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+                  <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 )}
               </Button>
             </DropdownMenuTrigger>
@@ -570,7 +574,7 @@ export function Topbar() {
                     >
                       <div className="flex flex-col">
                         <span className="font-medium">{organization.name}</span>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           {isCurrent
                             ? "Current"
                             : `Role: ${organization.role.replace("_", " ")}`}
@@ -615,16 +619,18 @@ export function Topbar() {
         </div>
 
         <div className="flex items-center gap-4">
+          <ThemeToggle />
+
           <Button
             variant="outline"
-            className="gap-2 min-w-[300px] justify-between text-slate-500 focus:ring-2 focus:ring-slate-900"
+            className="min-w-[300px] justify-between gap-2 text-muted-foreground"
             onClick={() => setSearchOpen(true)}
           >
             <div className="flex items-center gap-2">
               <Search className="w-4 h-4" />
               <span>Search...</span>
             </div>
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 font-mono text-xs text-slate-600">
+            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs text-muted-foreground">
               Ctrl+K
             </kbd>
           </Button>
@@ -632,7 +638,7 @@ export function Topbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="relative focus:ring-2 focus:ring-slate-900"
+            className="relative"
             onClick={handleNotificationClick}
           >
             <Bell className="w-5 h-5" />
@@ -645,8 +651,8 @@ export function Topbar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-slate-900 rounded-lg p-1">
-                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+              <button className="flex items-center gap-2 rounded-lg p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <div className="w-8 h-8 rounded-full bg-foreground/80 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
                   {userAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -654,8 +660,17 @@ export function Topbar() {
                       alt="User avatar"
                       className="h-full w-full object-cover"
                     />
-                  ) : (
+                  ) : hasUserIdentity ? (
                     userInitials
+                  ) : (
+                    <Image
+                      src="/logo.webp"
+                      alt="OpsDesk logo"
+                      width={32}
+                      height={32}
+                      className="h-full w-full object-cover"
+                      sizes="32px"
+                    />
                   )}
                 </div>
               </button>
@@ -664,7 +679,7 @@ export function Topbar() {
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span>{userName || "Signed-in user"}</span>
-                  <span className="text-xs font-normal text-slate-500">
+                  <span className="text-xs font-normal text-muted-foreground">
                     {userEmail || "No email available"}
                   </span>
                 </div>
@@ -687,10 +702,10 @@ export function Topbar() {
 
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
         <DialogContent className="max-w-3xl overflow-hidden p-0">
-          <DialogHeader className="space-y-0 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-4 py-3">
+          <DialogHeader className="space-y-0 border-b border-border bg-gradient-to-r from-muted/50 to-background px-4 py-3">
             <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
-                <Search className="h-4 w-4 text-slate-600" />
+              <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                <Search className="h-4 w-4 text-muted-foreground" />
                 Global Search
               </DialogTitle>
               <div className="flex items-center gap-1">
@@ -699,16 +714,16 @@ export function Topbar() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-2">
-              <Badge variant="secondary" className="rounded-full bg-slate-200/70 text-slate-700">
+              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
                 Tickets
               </Badge>
-              <Badge variant="secondary" className="rounded-full bg-slate-200/70 text-slate-700">
+              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
                 Customers
               </Badge>
-              <Badge variant="secondary" className="rounded-full bg-slate-200/70 text-slate-700">
+              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
                 Orders
               </Badge>
-              <Badge variant="secondary" className="rounded-full bg-slate-200/70 text-slate-700">
+              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
                 Team Members
               </Badge>
             </div>
@@ -720,11 +735,11 @@ export function Topbar() {
               placeholder="Search tickets, customers, orders, team members..."
               className="text-sm"
             />
-            <CommandList className="max-h-[430px] bg-white">
+            <CommandList className="max-h-[430px] bg-background">
               {canRunSearch && !isSearchLoading && !searchError && totalSearchResults > 0 && (
-                <div className="border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
+                <div className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
                   Showing {totalSearchResults} results for
-                  <span className="px-1 font-medium text-slate-700">
+                  <span className="px-1 font-medium text-foreground">
                     {`"${normalizedSearchQuery}"`}
                   </span>
                 </div>
@@ -740,14 +755,14 @@ export function Topbar() {
                           key={action.id}
                           value={`quick-${action.id}-${action.label}`}
                           onSelect={() => handleQuickActionSelect(action)}
-                          className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
+                          className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-border data-[selected=true]:bg-muted"
                         >
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100">
-                            <Icon className="h-4 w-4 text-slate-600" />
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                            <Icon className="h-4 w-4 text-muted-foreground" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-slate-900">{action.label}</p>
-                            <p className="truncate text-xs text-slate-500">{action.subtitle}</p>
+                            <p className="truncate font-medium text-foreground">{action.label}</p>
+                            <p className="truncate text-xs text-muted-foreground">{action.subtitle}</p>
                           </div>
                           <CommandShortcut>{action.shortcut}</CommandShortcut>
                         </CommandItem>
@@ -766,14 +781,14 @@ export function Topbar() {
                         key={`recent-${item.type}-${item.id}`}
                         value={`recent-${item.type}-${item.id}-${item.title}`}
                         onSelect={() => handleSearchItemSelect(item)}
-                        className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-slate-300 data-[selected=true]:bg-slate-100"
+                        className="micro-interactive gap-3 rounded-md border border-transparent px-2 py-2 data-[selected=true]:border-border data-[selected=true]:bg-muted"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100">
-                          <Clock3 className="h-4 w-4 text-slate-500" />
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                          <Clock3 className="h-4 w-4 text-muted-foreground" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900">{item.title}</p>
-                          <p className="truncate text-xs text-slate-500">
+                          <p className="truncate font-medium text-foreground">{item.title}</p>
+                          <p className="truncate text-xs text-muted-foreground">
                             {item.subtitle} · {getRelativeSearchTime(item.selectedAt)}
                           </p>
                         </div>
@@ -786,7 +801,7 @@ export function Topbar() {
               )}
 
               {!canRunSearch && normalizedSearchQuery.length > 0 && (
-                <div className="px-3 py-7 text-center text-sm text-slate-500">
+                <div className="px-3 py-7 text-center text-sm text-muted-foreground">
                   Type at least {GLOBAL_SEARCH_MIN_QUERY_LENGTH} characters to search.
                 </div>
               )}
@@ -795,7 +810,7 @@ export function Topbar() {
                 normalizedSearchQuery.length === 0 &&
                 recentSearches.length === 0 &&
                 quickActions.length === 0 && (
-                <div className="px-3 py-10 text-center text-sm text-slate-500">
+                <div className="px-3 py-10 text-center text-sm text-muted-foreground">
                   Search anything in your workspace from one command palette.
                 </div>
               )}
@@ -805,7 +820,7 @@ export function Topbar() {
                   {[0, 1, 2, 3].map((index) => (
                     <div
                       key={`search-loading-${index}`}
-                      className="h-14 animate-pulse rounded-md border border-slate-200 bg-slate-50"
+                      className="h-14 animate-pulse rounded-md border border-border bg-muted/50"
                     />
                   ))}
                 </div>
@@ -894,7 +909,7 @@ export function Topbar() {
                 searchResults.length === 0 && <CommandEmpty>No matching records found.</CommandEmpty>}
             </CommandList>
           </Command>
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+          <div className="flex items-center justify-between border-t border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1">
                 <SearchKbd>Up/Down</SearchKbd>
@@ -958,3 +973,4 @@ export function Topbar() {
     </>
   );
 }
+

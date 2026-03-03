@@ -73,11 +73,11 @@ export default function PortalSignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-10">
+    <div className="min-h-screen bg-muted px-4 py-10">
       <div className="mx-auto w-full max-w-md">
-        <Card className="border-slate-200 bg-white">
+        <Card className="border-border bg-background">
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl text-slate-900">Customer Portal</CardTitle>
+            <CardTitle className="text-2xl text-foreground">Customer Portal</CardTitle>
             <CardDescription>
               Enter your customer email and we will send a secure sign-in link.
             </CardDescription>
@@ -134,4 +134,5 @@ export default function PortalSignInPage() {
     </div>
   );
 }
+
 

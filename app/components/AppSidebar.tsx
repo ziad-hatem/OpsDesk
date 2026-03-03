@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -48,14 +49,21 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-3 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white text-sm font-semibold">
-            OD
+          <div className="relative h-8 w-8 overflow-hidden rounded-lg border border-sidebar-border bg-background">
+            <Image
+              src="/logo.webp"
+              alt="OpsDesk logo"
+              fill
+              className="object-cover"
+              sizes="32px"
+              priority
+            />
           </div>
           <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-semibold text-slate-900">
+            <span className="text-sidebar-foreground truncate text-sm font-semibold">
               OpsDesk
             </span>
-            <span className="text-xs text-slate-500">Support Console</span>
+            <span className="text-sidebar-foreground/70 text-xs">Support Console</span>
           </div>
         </div>
       </SidebarHeader>
@@ -103,7 +111,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-600 group-data-[collapsible=icon]:hidden">
+        <div className="bg-sidebar-accent text-sidebar-foreground/70 rounded-md px-3 py-2 text-xs group-data-[collapsible=icon]:hidden">
           Signed in to OpsDesk
         </div>
       </SidebarFooter>

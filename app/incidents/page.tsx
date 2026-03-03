@@ -155,7 +155,7 @@ function severityBadgeClass(severity: IncidentSeverity): string {
   if (severity === "medium") {
     return "bg-amber-100 text-amber-800 hover:bg-amber-100";
   }
-  return "bg-slate-100 text-slate-700 hover:bg-slate-100";
+  return "bg-muted text-foreground hover:bg-muted";
 }
 
 function statusBadgeClass(status: IncidentStatus): string {
@@ -539,7 +539,7 @@ export default function IncidentsPage() {
     return (
       <div className="space-y-4 p-6">
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to manage incidents.
           </CardContent>
         </Card>
@@ -551,16 +551,16 @@ export default function IncidentsPage() {
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-1">
-          <h1 className="text-3xl font-semibold text-slate-900">Incident Management</h1>
-          <p className="text-slate-600">
+          <h1 className="text-3xl font-semibold text-foreground">Incident Management</h1>
+          <p className="text-muted-foreground">
             Create incidents, manage impacted services, and publish timeline updates.
           </p>
           {data?.organizationSlug ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Public status page:{" "}
               <Link
                 href={`/status/${data.organizationSlug}`}
-                className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2"
+                className="font-medium text-foreground underline decoration-border underline-offset-2"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -604,7 +604,7 @@ export default function IncidentsPage() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="flex items-center gap-2 py-8 text-slate-600">
+          <CardContent className="flex items-center gap-2 py-8 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading incidents...
           </CardContent>
@@ -622,7 +622,7 @@ export default function IncidentsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {canManage ? (
-                <form className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-6" onSubmit={handleCreateService}>
+                <form className="grid grid-cols-1 gap-3 rounded-lg border border-border p-4 md:grid-cols-2 xl:grid-cols-6" onSubmit={handleCreateService}>
                   <div className="space-y-2 xl:col-span-2">
                     <Label htmlFor="service-name">Service Name</Label>
                     <Input
@@ -688,10 +688,10 @@ export default function IncidentsPage() {
                       disabled={isCreatingService}
                     />
                   </div>
-                  <div className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 md:col-span-2 xl:col-span-3">
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 md:col-span-2 xl:col-span-3">
                     <div>
-                      <p className="text-sm font-medium text-slate-900">Show on public page</p>
-                      <p className="text-xs text-slate-500">Hide internal-only services</p>
+                      <p className="text-sm font-medium text-foreground">Show on public page</p>
+                      <p className="text-xs text-muted-foreground">Hide internal-only services</p>
                     </div>
                     <Switch
                       checked={createServiceForm.isPublic}
@@ -715,7 +715,7 @@ export default function IncidentsPage() {
               ) : null}
 
               {data.services.length === 0 ? (
-                <p className="text-sm text-slate-600">No services added yet.</p>
+                <p className="text-sm text-muted-foreground">No services added yet.</p>
               ) : (
                 <div className="space-y-3">
                   {data.services.map((service) => {
@@ -726,7 +726,7 @@ export default function IncidentsPage() {
                     return (
                       <div
                         key={service.id}
-                        className="rounded-lg border border-slate-200 bg-white p-4"
+                        className="rounded-lg border border-border bg-background p-4"
                       >
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
                           <div className="space-y-2 xl:col-span-2">
@@ -809,7 +809,7 @@ export default function IncidentsPage() {
                             <Badge variant="outline">
                               {draft.isPublic ? "Public" : "Internal"}
                             </Badge>
-                            <div className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1">
+                            <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
                               <Switch
                                 checked={draft.isPublic}
                                 onCheckedChange={(checked) =>
@@ -820,7 +820,7 @@ export default function IncidentsPage() {
                                 }
                                 disabled={!canManage || savingServiceId === service.id}
                               />
-                              <span className="text-xs text-slate-600">Public status</span>
+                              <span className="text-xs text-muted-foreground">Public status</span>
                             </div>
                           </div>
                           {canManage ? (
@@ -969,11 +969,11 @@ export default function IncidentsPage() {
                         disabled={isCreatingIncident}
                       />
                     </div>
-                    <div className="rounded-md border border-slate-200 px-3 py-2 md:col-span-2">
+                    <div className="rounded-md border border-border px-3 py-2 md:col-span-2">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium text-slate-900">Public incident</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-sm font-medium text-foreground">Public incident</p>
+                          <p className="text-xs text-muted-foreground">
                             Publish this incident and updates to the public status page.
                           </p>
                         </div>
@@ -991,7 +991,7 @@ export default function IncidentsPage() {
                   <div className="space-y-3">
                     <Label>Impacted Services</Label>
                     {data.services.length === 0 ? (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-muted-foreground">
                         Add at least one service before declaring incident impacts.
                       </p>
                     ) : (
@@ -1001,7 +1001,7 @@ export default function IncidentsPage() {
                           return (
                             <div
                               key={service.id}
-                              className="rounded-md border border-slate-200 p-3"
+                              className="rounded-md border border-border p-3"
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
@@ -1080,7 +1080,7 @@ export default function IncidentsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {activeIncidents.length === 0 ? (
-                <p className="text-sm text-slate-600">No active incidents.</p>
+                <p className="text-sm text-muted-foreground">No active incidents.</p>
               ) : (
                 activeIncidents.map((incident) => {
                   const timelineDraft = timelineDrafts[incident.id] ?? {
@@ -1089,11 +1089,11 @@ export default function IncidentsPage() {
                     isPublic: incident.is_public,
                   };
                   return (
-                    <div key={incident.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div key={incident.id} className="rounded-lg border border-border bg-background p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <p className="font-semibold text-slate-900">{incident.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="font-semibold text-foreground">{incident.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
                             Started {formatDateTime(incident.started_at)}
                           </p>
                         </div>
@@ -1109,7 +1109,7 @@ export default function IncidentsPage() {
                       </div>
 
                       {incident.summary ? (
-                        <p className="mt-3 text-sm text-slate-700">{incident.summary}</p>
+                        <p className="mt-3 text-sm text-foreground">{incident.summary}</p>
                       ) : null}
 
                       {incident.impacts.length > 0 ? (
@@ -1124,32 +1124,32 @@ export default function IncidentsPage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="mt-3 text-xs text-slate-500">No impacted services linked.</p>
+                        <p className="mt-3 text-xs text-muted-foreground">No impacted services linked.</p>
                       )}
 
                       <div className="mt-4 space-y-2">
                         {incident.updates.length === 0 ? (
-                          <p className="text-sm text-slate-500">No timeline updates yet.</p>
+                          <p className="text-sm text-muted-foreground">No timeline updates yet.</p>
                         ) : (
                           incident.updates.map((update) => (
                             <div
                               key={update.id}
-                              className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                              className="rounded-md border border-border bg-muted/50 p-3"
                             >
-                              <div className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+                              <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
                                 <span>{formatDateTime(update.created_at)}</span>
                                 {update.status ? <span>| {toLabel(update.status)}</span> : null}
                                 {update.is_public ? <span>| Public</span> : <span>| Internal</span>}
                               </div>
-                              <p className="text-sm text-slate-700">{update.message}</p>
+                              <p className="text-sm text-foreground">{update.message}</p>
                             </div>
                           ))
                         )}
                       </div>
 
                       {canManage ? (
-                        <div className="mt-4 rounded-md border border-slate-200 p-3">
-                          <p className="mb-2 text-sm font-medium text-slate-900">Add Timeline Update</p>
+                        <div className="mt-4 rounded-md border border-border p-3">
+                          <p className="mb-2 text-sm font-medium text-foreground">Add Timeline Update</p>
                           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                             <div className="space-y-2">
                               <Label>Status</Label>
@@ -1178,10 +1178,10 @@ export default function IncidentsPage() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 lg:col-span-2">
+                            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 lg:col-span-2">
                               <div>
-                                <p className="text-sm font-medium text-slate-900">Public update</p>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-sm font-medium text-foreground">Public update</p>
+                                <p className="text-xs text-muted-foreground">
                                   Visible on external status page when enabled.
                                 </p>
                               </div>
@@ -1248,14 +1248,14 @@ export default function IncidentsPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {resolvedIncidents.length === 0 ? (
-                <p className="text-sm text-slate-600">No resolved incidents yet.</p>
+                <p className="text-sm text-muted-foreground">No resolved incidents yet.</p>
               ) : (
                 resolvedIncidents.map((incident) => (
-                  <div key={incident.id} className="rounded-md border border-slate-200 p-3">
+                  <div key={incident.id} className="rounded-md border border-border p-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-slate-900">{incident.title}</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="font-medium text-foreground">{incident.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Resolved {formatDateTime(incident.resolved_at)}
                         </p>
                       </div>
@@ -1317,3 +1317,4 @@ export default function IncidentsPage() {
     </div>
   );
 }
+

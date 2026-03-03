@@ -424,11 +424,11 @@ export default function SettingsTeam() {
           const member = row.original;
           return (
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+              <div className="bg-muted text-foreground flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold">
                 {getInitials(member.name, member.email)}
               </div>
               <div>
-                <p className="font-medium text-slate-900">{member.name ?? "Unnamed user"}</p>
+                <p className="font-medium text-foreground">{member.name ?? "Unnamed user"}</p>
               </div>
             </div>
           );
@@ -437,7 +437,7 @@ export default function SettingsTeam() {
       {
         accessorKey: "email",
         header: "Email",
-        cell: ({ row }) => <span className="text-slate-700">{row.original.email}</span>,
+        cell: ({ row }) => <span className="text-foreground">{row.original.email}</span>,
       },
       {
         accessorKey: "role",
@@ -498,7 +498,7 @@ export default function SettingsTeam() {
         accessorKey: "joined_at",
         header: "Joined",
         cell: ({ row }) => (
-          <span className="text-slate-600">{formatDate(row.original.joined_at)}</span>
+          <span className="text-muted-foreground">{formatDate(row.original.joined_at)}</span>
         ),
       },
       {
@@ -508,11 +508,11 @@ export default function SettingsTeam() {
           const member = row.original;
 
           if (!permissions?.canSuspendRemove) {
-            return <span className="text-slate-400">-</span>;
+            return <span className="text-muted-foreground/70">-</span>;
           }
 
           if (currentUserId && member.user_id === currentUserId) {
-            return <span className="text-slate-400">Self</span>;
+            return <span className="text-muted-foreground/70">Self</span>;
           }
 
           return (
@@ -562,7 +562,7 @@ export default function SettingsTeam() {
       {
         accessorKey: "email",
         header: "Email",
-        cell: ({ row }) => <span className="text-slate-700">{row.original.email}</span>,
+        cell: ({ row }) => <span className="text-foreground">{row.original.email}</span>,
       },
       {
         accessorKey: "role",
@@ -577,21 +577,21 @@ export default function SettingsTeam() {
         accessorKey: "invited_by_name",
         header: "Invited by",
         cell: ({ row }) => (
-          <span className="text-slate-700">{row.original.invited_by_name ?? "Unknown user"}</span>
+          <span className="text-foreground">{row.original.invited_by_name ?? "Unknown user"}</span>
         ),
       },
       {
         accessorKey: "created_at",
         header: "Sent at",
         cell: ({ row }) => (
-          <span className="text-slate-600">{formatDateTime(row.original.created_at)}</span>
+          <span className="text-muted-foreground">{formatDateTime(row.original.created_at)}</span>
         ),
       },
       {
         accessorKey: "expires_at",
         header: "Expires",
         cell: ({ row }) => (
-          <span className="text-slate-600">{formatDateTime(row.original.expires_at)}</span>
+          <span className="text-muted-foreground">{formatDateTime(row.original.expires_at)}</span>
         ),
       },
       {
@@ -603,7 +603,7 @@ export default function SettingsTeam() {
             Boolean(permissions?.canInvite) && manageableInviteRoles.has(invite.role);
 
           if (!canManageInvite) {
-            return <span className="text-slate-400">-</span>;
+            return <span className="text-muted-foreground/70">-</span>;
           }
 
           return (
@@ -641,8 +641,8 @@ export default function SettingsTeam() {
   const roleCards = ROLE_ORDER.map((role) => (
     <Card key={role}>
       <CardContent className="p-4">
-        <h3 className="font-medium text-slate-900 mb-1">{getRoleLabel(role)}</h3>
-        <p className="text-sm text-slate-600">{ROLE_DESCRIPTIONS[role]}</p>
+        <h3 className="font-medium text-foreground mb-1">{getRoleLabel(role)}</h3>
+        <p className="text-sm text-muted-foreground">{ROLE_DESCRIPTIONS[role]}</p>
       </CardContent>
     </Card>
   ));
@@ -652,7 +652,7 @@ export default function SettingsTeam() {
       <div className="p-6 space-y-4">
         <SettingsNav />
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to manage team members.
           </CardContent>
         </Card>
@@ -665,12 +665,12 @@ export default function SettingsTeam() {
       <SettingsNav />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Team & Roles</h1>
-          <p className="text-slate-600 mt-1">
+          <h1 className="text-3xl font-semibold text-foreground">Team & Roles</h1>
+          <p className="text-muted-foreground mt-1">
             Manage members, pending invites, and role access for this organization.
           </p>
           {currentUserRole && (
-            <p className="text-sm text-slate-500 mt-2">
+            <p className="text-sm text-muted-foreground mt-2">
               Your role: <span className="font-medium">{getRoleLabel(currentUserRole)}</span>
             </p>
           )}
@@ -760,7 +760,7 @@ export default function SettingsTeam() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-500">
+            <div className="rounded-lg border border-border bg-background p-10 text-center text-muted-foreground">
               <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
               Loading members...
             </div>
@@ -781,7 +781,7 @@ export default function SettingsTeam() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-500">
+            <div className="rounded-lg border border-border bg-background p-10 text-center text-muted-foreground">
               <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
               Loading invites...
             </div>
@@ -798,3 +798,4 @@ export default function SettingsTeam() {
     </div>
   );
 }
+

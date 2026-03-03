@@ -327,13 +327,13 @@ export default function MagicLinkCallbackPage() {
 
   if (state.isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Signing You In</CardTitle>
             <CardDescription>Validating your magic link...</CardDescription>
           </CardHeader>
-          <CardContent className="flex items-center text-slate-600">
+          <CardContent className="flex items-center text-muted-foreground">
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             Completing login, please wait.
           </CardContent>
@@ -344,7 +344,7 @@ export default function MagicLinkCallbackPage() {
 
   if (state.requiresMfa) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Verify Your Sign-In</CardTitle>
@@ -353,7 +353,7 @@ export default function MagicLinkCallbackPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {state.info ? <p className="text-sm text-slate-600">{state.info}</p> : null}
+            {state.info ? <p className="text-sm text-muted-foreground">{state.info}</p> : null}
             {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
 
             <div className="space-y-2">
@@ -416,7 +416,7 @@ export default function MagicLinkCallbackPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -434,3 +434,4 @@ export default function MagicLinkCallbackPage() {
     </div>
   );
 }
+

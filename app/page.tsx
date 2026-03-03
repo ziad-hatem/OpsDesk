@@ -107,19 +107,29 @@ export default function DashboardPage() {
     () => dashboard?.highPriorityTickets ?? [],
     [dashboard?.highPriorityTickets],
   );
+  const chartGridColor = "var(--color-border)";
+  const chartAxisColor = "var(--color-muted-foreground)";
+  const chartPrimaryColor = "var(--color-primary)";
+  const chartSecondaryColor = "var(--color-chart-2)";
+  const chartTooltipStyle = {
+    backgroundColor: "var(--color-popover)",
+    border: "1px solid var(--color-border)",
+    borderRadius: "8px",
+    color: "var(--color-popover-foreground)",
+  } as const;
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-slate-600 mt-1">
+          <h1 className="text-3xl font-semibold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
             Live metrics for your active organization.
           </p>
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="gap-2 focus:ring-2 focus:ring-slate-900">
+            <Button variant="outline" className="gap-2 focus:ring-2 focus-visible:ring-ring">
               <CalendarIcon className="w-4 h-4" />
               {dateRange?.from ? (
                 dateRange.to ? (
@@ -182,41 +192,37 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="h-[400px] flex items-center justify-center text-slate-500">
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground">
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Loading chart...
             </div>
           ) : chartData.length === 0 ? (
-            <div className="h-[400px] flex items-center justify-center text-slate-500">
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground">
               No revenue data for this date range.
             </div>
           ) : (
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="date" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                  <XAxis dataKey="date" stroke={chartAxisColor} />
+                  <YAxis stroke={chartAxisColor} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                    }}
+                    contentStyle={chartTooltipStyle}
                     formatter={(value: number) => formatMoney(value)}
                   />
                   <Legend />
                   <Line
                     type="monotone"
                     dataKey="current"
-                    stroke="#0f172a"
+                    stroke={chartPrimaryColor}
                     strokeWidth={2}
                     name="Current Period"
                   />
                   <Line
                     type="monotone"
                     dataKey="previous"
-                    stroke="#94a3b8"
+                    stroke={chartSecondaryColor}
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     name="Previous Period"
@@ -235,34 +241,30 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="h-[260px] flex items-center justify-center text-slate-500">
+            <div className="h-[260px] flex items-center justify-center text-muted-foreground">
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Loading SLA trend...
             </div>
           ) : slaComplianceTrend.length === 0 ? (
-            <div className="h-[260px] flex items-center justify-center text-slate-500">
+            <div className="h-[260px] flex items-center justify-center text-muted-foreground">
               No SLA trend data for this date range.
             </div>
           ) : (
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={slaComplianceTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" stroke="#64748b" />
-                  <YAxis stroke="#64748b" domain={[0, 100]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                  <XAxis dataKey="label" stroke={chartAxisColor} />
+                  <YAxis stroke={chartAxisColor} domain={[0, 100]} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                    }}
+                    contentStyle={chartTooltipStyle}
                     formatter={(value: number) => `${value.toFixed(1)}%`}
                   />
                   <Legend />
                   <Line
                     type="monotone"
                     dataKey="compliance"
-                    stroke="#0f172a"
+                    stroke={chartPrimaryColor}
                     strokeWidth={2}
                     name="Compliance %"
                   />
@@ -281,25 +283,25 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="py-10 flex items-center justify-center text-slate-500">
+              <div className="py-10 flex items-center justify-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading orders...
               </div>
             ) : recentOrders.length === 0 ? (
-              <div className="py-10 text-center text-slate-500">No orders found.</div>
+              <div className="py-10 text-center text-muted-foreground">No orders found.</div>
             ) : (
               <div className="space-y-4">
                 {recentOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
+                    className="flex items-center justify-between py-2 border-b border-border/60 last:border-0"
                   >
                     <div>
-                      <p className="font-medium text-slate-900">{order.order_number}</p>
-                      <p className="text-sm text-slate-600">{order.customer_name ?? "Unknown customer"}</p>
+                      <p className="font-medium text-foreground">{order.order_number}</p>
+                      <p className="text-sm text-muted-foreground">{order.customer_name ?? "Unknown customer"}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-foreground">
                         {formatMoney(order.total_amount, order.currency)}
                       </p>
                       <div className="mt-1">
@@ -320,12 +322,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="py-10 flex items-center justify-center text-slate-500">
+              <div className="py-10 flex items-center justify-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading tickets...
               </div>
             ) : highPriorityTickets.length === 0 ? (
-              <div className="py-10 text-center text-slate-500">
+              <div className="py-10 text-center text-muted-foreground">
                 No high priority open tickets.
               </div>
             ) : (
@@ -333,12 +335,12 @@ export default function DashboardPage() {
                 {highPriorityTickets.map((ticket) => (
                   <div
                     key={ticket.id}
-                    className="flex items-start justify-between py-2 border-b border-slate-100 last:border-0"
+                    className="flex items-start justify-between py-2 border-b border-border/60 last:border-0"
                   >
                     <div className="flex-1">
-                      <p className="font-medium text-slate-900">{toTicketCode(ticket.id)}</p>
-                      <p className="text-sm text-slate-700">{ticket.title}</p>
-                      <p className="text-xs text-slate-600 mt-1">
+                      <p className="font-medium text-foreground">{toTicketCode(ticket.id)}</p>
+                      <p className="text-sm text-foreground">{ticket.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
                         {ticket.customer_name ?? "No customer linked"}
                       </p>
                     </div>
@@ -356,3 +358,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

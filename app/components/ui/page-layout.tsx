@@ -22,7 +22,7 @@ function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 border-b border-slate-200/80 pb-4 md:flex-row md:items-end md:justify-between",
+        "flex flex-col gap-2 border-b border-border/80 pb-4 md:flex-row md:items-end md:justify-between",
         className,
       )}
       {...props}
@@ -36,7 +36,7 @@ function PageTitle({
 }: React.ComponentProps<"h1">) {
   return (
     <h1
-      className={cn("text-3xl font-semibold tracking-tight text-slate-900", className)}
+      className={cn("text-3xl font-semibold tracking-tight text-foreground", className)}
       {...props}
     />
   );
@@ -47,7 +47,7 @@ function PageDescription({
   ...props
 }: React.ComponentProps<"p">) {
   return (
-    <p className={cn("text-sm text-slate-600", className)} {...props} />
+    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
   );
 }
 
@@ -58,7 +58,7 @@ function StickyActionBar({
   return (
     <div
       className={cn(
-        "sticky top-0 z-20 -mx-1 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80",
+        "sticky top-0 z-20 -mx-1 rounded-xl border border-border bg-background/90 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80",
         className,
       )}
       {...props}
@@ -67,4 +67,5 @@ function StickyActionBar({
 }
 
 export { PageShell, PageHeader, PageTitle, PageDescription, StickyActionBar };
+
 

@@ -158,7 +158,7 @@ function getTrendClass(
   direction: "higher-better" | "lower-better",
 ): string {
   if (deltaPercent === null || deltaPercent === 0) {
-    return "text-slate-500";
+    return "text-muted-foreground";
   }
   const improved = direction === "higher-better" ? deltaPercent > 0 : deltaPercent < 0;
   return improved ? "text-green-600" : "text-red-600";
@@ -279,6 +279,16 @@ export default function ReportsPage() {
   const comparisonLabel = compareWith === "year" ? "Last Year" : "Previous Period";
 
   const metrics = reports?.metrics;
+  const chartGridColor = "var(--color-border)";
+  const chartAxisColor = "var(--color-muted-foreground)";
+  const chartPrimaryColor = "var(--color-primary)";
+  const chartSecondaryColor = "var(--color-chart-2)";
+  const chartTooltipStyle = {
+    backgroundColor: "var(--color-popover)",
+    border: "1px solid var(--color-border)",
+    borderRadius: "8px",
+    color: "var(--color-popover-foreground)",
+  } as const;
 
   const avgResponseBaseline = metrics
     ? getMetricBaseline(metrics.avgResponseTimeMinutes, compareWith)
@@ -526,7 +536,7 @@ export default function ReportsPage() {
     return (
       <div className="p-6">
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to view reports.
           </CardContent>
         </Card>
@@ -538,15 +548,15 @@ export default function ReportsPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Analytics</h1>
-          <p className="text-slate-600 mt-1">Insights and performance metrics</p>
+          <h1 className="text-3xl font-semibold text-foreground">Analytics</h1>
+          <p className="text-muted-foreground mt-1">Insights and performance metrics</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={compareWith}
             onValueChange={(value) => setCompareWith(value as ReportsCompareWith)}
           >
-            <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-slate-900">
+            <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-ring">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -557,7 +567,7 @@ export default function ReportsPage() {
           </Select>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2 focus:ring-2 focus:ring-slate-900">
+              <Button variant="outline" className="gap-2 focus:ring-2 focus:ring-ring">
                 <CalendarIcon className="w-4 h-4" />
                 {dateRange?.from ? (
                   dateRange.to ? (
@@ -586,7 +596,7 @@ export default function ReportsPage() {
           </Popover>
           <Button
             variant="outline"
-            className="gap-2 focus:ring-2 focus:ring-slate-900"
+            className="gap-2 focus:ring-2 focus:ring-ring"
             onClick={handleExportCsv}
             disabled={isLoading || !reports}
           >
@@ -615,12 +625,12 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {isSchedulesLoading ? (
-            <div className="flex items-center text-slate-500">
+            <div className="flex items-center text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Loading schedules...
             </div>
           ) : schedules.length === 0 ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               No schedules yet. Create one to email executive analytics automatically.
             </p>
           ) : (
@@ -628,12 +638,12 @@ export default function ReportsPage() {
               {schedules.map((schedule) => (
                 <div
                   key={schedule.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3"
+                  className="rounded-lg border border-border bg-muted/70 p-3"
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-slate-900">{schedule.name}</p>
+                        <p className="font-medium text-foreground">{schedule.name}</p>
                         <Badge variant={schedule.is_enabled ? "default" : "outline"}>
                           {schedule.is_enabled ? "Enabled" : "Disabled"}
                         </Badge>
@@ -642,16 +652,16 @@ export default function ReportsPage() {
                         </Badge>
                         <Badge variant="outline">{schedule.range_days}d range</Badge>
                       </div>
-                      <p className="text-xs text-slate-600">
+                      <p className="text-xs text-muted-foreground">
                         Next run: {formatDateTime(schedule.next_run_at)} | Last run:{" "}
                         {formatDateTime(schedule.last_run_at)}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         Recipients: {schedule.recipients.join(", ")}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Switch
                           checked={schedule.is_enabled}
                           onCheckedChange={(checked) => {
@@ -677,19 +687,19 @@ export default function ReportsPage() {
           )}
 
           {recentRuns.length > 0 ? (
-            <div className="border-t border-slate-200 pt-4">
-              <p className="mb-2 text-sm font-medium text-slate-800">Recent Deliveries</p>
+            <div className="border-t border-border pt-4">
+              <p className="mb-2 text-sm font-medium text-foreground">Recent Deliveries</p>
               <div className="space-y-2">
                 {recentRuns.slice(0, 5).map((run) => (
                   <div
                     key={run.id}
-                    className="flex flex-col gap-1 rounded-md border border-slate-200 p-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-1 rounded-md border border-border p-2 text-xs sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <p className="text-slate-700">
+                    <p className="text-foreground">
                       {run.status === "success" ? "Delivered" : "Failed"} |{" "}
                       {formatDateTime(run.created_at)}
                     </p>
-                    <p className="text-slate-500">
+                    <p className="text-muted-foreground">
                       {run.recipients.length} recipient(s)
                       {run.error_message ? ` | ${run.error_message}` : ""}
                     </p>
@@ -845,34 +855,30 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="h-[400px] flex items-center justify-center text-slate-500">
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground">
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Loading chart...
             </div>
           ) : revenueData.length === 0 ? (
-            <div className="h-[400px] flex items-center justify-center text-slate-500">
+            <div className="h-[400px] flex items-center justify-center text-muted-foreground">
               No revenue data for this range.
             </div>
           ) : (
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                  <XAxis dataKey="label" stroke={chartAxisColor} />
+                  <YAxis stroke={chartAxisColor} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                    }}
+                    contentStyle={chartTooltipStyle}
                     formatter={(value: number) => formatMoney(value)}
                   />
                   <Legend />
                   <Line
                     type="monotone"
                     dataKey="current"
-                    stroke="#0f172a"
+                    stroke={chartPrimaryColor}
                     strokeWidth={2}
                     name="Current Period"
                   />
@@ -880,7 +886,7 @@ export default function ReportsPage() {
                     <Line
                       type="monotone"
                       dataKey={comparisonDataKey}
-                      stroke="#94a3b8"
+                      stroke={chartSecondaryColor}
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       name={comparisonLabel}
@@ -901,31 +907,35 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="h-[300px] flex items-center justify-center text-slate-500">
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading ticket volume...
               </div>
             ) : ticketVolumeData.length === 0 ? (
-              <div className="h-[300px] flex items-center justify-center text-slate-500">
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 No ticket activity in this range.
               </div>
             ) : (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={ticketVolumeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="day" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                      }}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                    <XAxis dataKey="day" stroke={chartAxisColor} />
+                    <YAxis stroke={chartAxisColor} />
+                    <Tooltip contentStyle={chartTooltipStyle} />
                     <Legend />
-                    <Bar dataKey="tickets" fill="#0f172a" name="Created" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="resolved" fill="#94a3b8" name="Resolved" radius={[4, 4, 0, 0]} />
+                    <Bar
+                      dataKey="tickets"
+                      fill={chartPrimaryColor}
+                      name="Created"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="resolved"
+                      fill={chartSecondaryColor}
+                      name="Resolved"
+                      radius={[4, 4, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -940,32 +950,26 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="h-[300px] flex items-center justify-center text-slate-500">
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading customer growth...
               </div>
             ) : customerGrowthData.length === 0 ? (
-              <div className="h-[300px] flex items-center justify-center text-slate-500">
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 No customer data in this range.
               </div>
             ) : (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={customerGrowthData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                      }}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                    <XAxis dataKey="month" stroke={chartAxisColor} />
+                    <YAxis stroke={chartAxisColor} />
+                    <Tooltip contentStyle={chartTooltipStyle} />
                     <Line
                       type="monotone"
                       dataKey="customers"
-                      stroke="#0f172a"
+                      stroke={chartPrimaryColor}
                       strokeWidth={2}
                       name="Customers"
                     />
@@ -986,34 +990,30 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="h-[300px] flex items-center justify-center text-slate-500">
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Loading SLA trend...
             </div>
           ) : slaComplianceData.length === 0 ? (
-            <div className="h-[300px] flex items-center justify-center text-slate-500">
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
               No SLA data in this range.
             </div>
           ) : (
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={slaComplianceData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="label" stroke="#64748b" />
-                  <YAxis stroke="#64748b" domain={[0, 100]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                  <XAxis dataKey="label" stroke={chartAxisColor} />
+                  <YAxis stroke={chartAxisColor} domain={[0, 100]} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                    }}
+                    contentStyle={chartTooltipStyle}
                     formatter={(value: number) => `${value.toFixed(1)}%`}
                   />
                   <Legend />
                   <Line
                     type="monotone"
                     dataKey="compliance"
-                    stroke="#0f172a"
+                    stroke={chartPrimaryColor}
                     strokeWidth={2}
                     name="Compliance %"
                   />
@@ -1027,8 +1027,8 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">Avg Response Time</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">Avg Response Time</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatMinutes(metrics?.avgResponseTimeMinutes.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(avgResponseDelta, "lower-better")}`}>
@@ -1038,8 +1038,8 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">Avg Resolution Time</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">Avg Resolution Time</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatMinutes(metrics?.avgResolutionTimeMinutes.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(avgResolutionDelta, "lower-better")}`}>
@@ -1049,8 +1049,8 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">Incident MTTR</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">Incident MTTR</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatMinutes(metrics?.incidentMttrMinutes.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(incidentMttrDelta, "lower-better")}`}>
@@ -1060,8 +1060,8 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">Customer Satisfaction</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">Customer Satisfaction</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatPercent(metrics?.customerSatisfactionScore.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(satisfactionDelta, "higher-better")}`}>
@@ -1071,8 +1071,8 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">First Contact Resolution</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">First Contact Resolution</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatPercent(metrics?.firstContactResolutionRate.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(fcrDelta, "higher-better")}`}>
@@ -1082,8 +1082,8 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">Ticket Backlog</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">Ticket Backlog</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatCount(metrics?.ticketBacklogCount.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(backlogDelta, "lower-better")}`}>
@@ -1093,8 +1093,8 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-slate-600 mb-1">SLA Compliance</p>
-            <p className="text-2xl font-semibold text-slate-900">
+            <p className="text-sm text-muted-foreground mb-1">SLA Compliance</p>
+            <p className="text-2xl font-semibold text-foreground">
               {formatPercent(metrics?.slaComplianceRate.current ?? null)}
             </p>
             <p className={`text-xs mt-1 ${getTrendClass(slaComplianceDelta, "higher-better")}`}>
@@ -1106,3 +1106,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

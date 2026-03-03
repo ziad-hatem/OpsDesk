@@ -77,7 +77,7 @@ function summarizeDetails(details: Record<string, unknown> | null): string {
     return "-";
   }
 
-  return parts.join(" • ");
+  return parts.join(" | ");
 }
 
 function actorLabel(item: AuditLogItem): string {
@@ -226,7 +226,7 @@ export default function SettingsActivity() {
       <div className="space-y-4 p-6">
         <SettingsNav />
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to view activity logs.
           </CardContent>
         </Card>
@@ -239,8 +239,8 @@ export default function SettingsActivity() {
       <SettingsNav />
 
       <div className="space-y-1">
-        <h1 className="text-3xl font-semibold text-slate-900">Activity Timeline</h1>
-        <p className="text-slate-600">
+        <h1 className="text-3xl font-semibold text-foreground">Activity Timeline</h1>
+        <p className="text-muted-foreground">
           Review security and operational events for this organization.
         </p>
       </div>
@@ -252,7 +252,7 @@ export default function SettingsActivity() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-900">Action</p>
+              <p className="text-sm font-medium text-foreground">Action</p>
               <Select
                 value={actionFilter}
                 onValueChange={(value) => {
@@ -275,7 +275,7 @@ export default function SettingsActivity() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-900">Actor</p>
+              <p className="text-sm font-medium text-foreground">Actor</p>
               <Select
                 value={actorFilter}
                 onValueChange={(value) => {
@@ -298,7 +298,7 @@ export default function SettingsActivity() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-900">From</p>
+              <p className="text-sm font-medium text-foreground">From</p>
               <Input
                 type="date"
                 value={fromDate}
@@ -310,7 +310,7 @@ export default function SettingsActivity() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-900">To</p>
+              <p className="text-sm font-medium text-foreground">To</p>
               <Input
                 type="date"
                 value={toDate}
@@ -322,7 +322,7 @@ export default function SettingsActivity() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-900">Rows</p>
+              <p className="text-sm font-medium text-foreground">Rows</p>
               <Select
                 value={String(limit)}
                 onValueChange={(value) => {
@@ -345,7 +345,7 @@ export default function SettingsActivity() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm text-slate-500">
+            <div className="text-sm text-muted-foreground">
               Showing {tableRows.length} of {total} events
             </div>
             <div className="flex items-center gap-2">
@@ -376,16 +376,16 @@ export default function SettingsActivity() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-500">
+            <div className="rounded-lg border border-border bg-background p-10 text-center text-muted-foreground">
               <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
               Loading activity...
             </div>
           ) : tableRows.length === 0 ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-500">
+            <div className="rounded-lg border border-border bg-background p-10 text-center text-muted-foreground">
               No activity found for the selected filters.
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-200">
+            <div className="rounded-lg border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -399,17 +399,17 @@ export default function SettingsActivity() {
                 <TableBody>
                   {tableRows.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell className="text-xs text-slate-600">
+                      <TableCell className="text-xs text-muted-foreground">
                         {formatDateTime(row.created_at)}
                       </TableCell>
-                      <TableCell className="text-sm font-medium text-slate-900">
+                      <TableCell className="text-sm font-medium text-foreground">
                         {row.action_label}
                       </TableCell>
-                      <TableCell className="text-sm text-slate-700">{row.actorLabel}</TableCell>
-                      <TableCell className="text-xs text-slate-600">
+                      <TableCell className="text-sm text-foreground">{row.actorLabel}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
                         {row.entityLabel}
                       </TableCell>
-                      <TableCell className="text-sm text-slate-700">
+                      <TableCell className="text-sm text-foreground">
                         <span className="break-all">{row.detailsLabel}</span>
                       </TableCell>
                     </TableRow>
@@ -420,7 +420,7 @@ export default function SettingsActivity() {
           )}
 
           <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Page {page} of {totalPages}
             </p>
             <div className="flex items-center gap-2">
@@ -447,3 +447,4 @@ export default function SettingsActivity() {
     </div>
   );
 }
+

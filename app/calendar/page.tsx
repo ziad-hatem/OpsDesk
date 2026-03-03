@@ -208,7 +208,7 @@ export default function CalendarPage() {
     return (
       <div className="p-6">
         <Card>
-          <CardContent className="p-6 text-slate-600">
+          <CardContent className="p-6 text-muted-foreground">
             Select or create an organization to view calendar events.
           </CardContent>
         </Card>
@@ -219,8 +219,8 @@ export default function CalendarPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-slate-900">Calendar</h1>
-        <p className="text-slate-600 mt-1">
+        <h1 className="text-3xl font-semibold text-foreground">Calendar</h1>
+        <p className="text-muted-foreground mt-1">
           Track SLA due tickets and order activity by date.
         </p>
       </div>
@@ -228,20 +228,20 @@ export default function CalendarPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-slate-600">Events Today</p>
-            <p className="text-2xl font-semibold text-slate-900 mt-1">{todayEventsCount}</p>
+            <p className="text-sm text-muted-foreground">Events Today</p>
+            <p className="text-2xl font-semibold text-foreground mt-1">{todayEventsCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-slate-600">Overdue Tickets</p>
-            <p className="text-2xl font-semibold text-slate-900 mt-1">{overdueTicketsCount}</p>
+            <p className="text-sm text-muted-foreground">Overdue Tickets</p>
+            <p className="text-2xl font-semibold text-foreground mt-1">{overdueTicketsCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-slate-600">Next 7 Days</p>
-            <p className="text-2xl font-semibold text-slate-900 mt-1">{nextSevenDaysCount}</p>
+            <p className="text-sm text-muted-foreground">Next 7 Days</p>
+            <p className="text-2xl font-semibold text-foreground mt-1">{nextSevenDaysCount}</p>
           </CardContent>
         </Card>
       </div>
@@ -257,7 +257,7 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="py-10 flex items-center justify-center text-slate-500">
+              <div className="py-10 flex items-center justify-center text-muted-foreground">
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 Loading calendar...
               </div>
@@ -280,7 +280,7 @@ export default function CalendarPage() {
                 modifiers={{ hasEvents: eventDays }}
                 modifiersClassNames={{
                   hasEvents:
-                    "after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-slate-900",
+                    "after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-primary",
                 }}
               />
             )}
@@ -296,32 +296,32 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="py-12 flex items-center justify-center text-slate-500">
+              <div className="py-12 flex items-center justify-center text-muted-foreground">
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 Loading events...
               </div>
             ) : selectedDayEvents.length === 0 ? (
-              <div className="py-12 text-center text-slate-500">No events for this date.</div>
+              <div className="py-12 text-center text-muted-foreground">No events for this date.</div>
             ) : (
               <div className="space-y-3">
                 {selectedDayEvents.map((event) => (
                   <button
                     key={event.id}
                     onClick={() => router.push(event.href)}
-                    className="w-full text-left rounded-lg border border-slate-200 p-4 hover:bg-slate-50 transition-colors"
+                    className="w-full text-left rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           {event.type === "ticket" ? (
-                            <Ticket className="h-4 w-4 text-slate-600" />
+                            <Ticket className="h-4 w-4 text-muted-foreground" />
                           ) : (
-                            <ShoppingCart className="h-4 w-4 text-slate-600" />
+                            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
                           )}
-                          <p className="font-medium text-slate-900 truncate">{event.title}</p>
+                          <p className="font-medium text-foreground truncate">{event.title}</p>
                         </div>
-                        <p className="text-sm text-slate-600 truncate">{event.subtitle}</p>
-                        <p className="text-xs text-slate-500 mt-2">{formatDateTime(event.at)}</p>
+                        <p className="text-sm text-muted-foreground truncate">{event.subtitle}</p>
+                        <p className="text-xs text-muted-foreground mt-2">{formatDateTime(event.at)}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <Badge variant="secondary" className="capitalize">
@@ -347,3 +347,4 @@ export default function CalendarPage() {
     </div>
   );
 }
+

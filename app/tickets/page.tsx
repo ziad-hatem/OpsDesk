@@ -367,7 +367,7 @@ export default function TicketsListPage() {
         cell: ({ row }) => (
           <button
             onClick={() => router.push(`/tickets/${row.original.id}`)}
-            className="font-medium text-slate-900 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+            className="font-medium text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
           >
             {toTicketCode(row.original.id)}
           </button>
@@ -378,9 +378,9 @@ export default function TicketsListPage() {
         header: "Title",
         cell: ({ row }) => (
           <div className="max-w-[460px]">
-            <p className="font-medium text-slate-900">{row.original.title}</p>
+            <p className="font-medium text-foreground">{row.original.title}</p>
             {row.original.description && (
-              <p className="text-xs text-slate-500 truncate">{row.original.description}</p>
+              <p className="text-xs text-muted-foreground truncate">{row.original.description}</p>
             )}
           </div>
         ),
@@ -402,33 +402,33 @@ export default function TicketsListPage() {
           row.original.customer ? (
             <button
               onClick={() => router.push(`/customers/${row.original.customer?.id}`)}
-              className="text-slate-700 hover:underline focus:outline-none focus:ring-2 focus:ring-slate-900 rounded"
+              className="text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
             >
               {row.original.customer.name}
             </button>
           ) : (
-            <span className="text-slate-400">-</span>
+            <span className="text-muted-foreground/70">-</span>
           ),
       },
       {
         accessorKey: "assignee",
         header: "Assignee",
         cell: ({ row }) => (
-          <span className="text-slate-700">{formatUserDisplay(row.original.assignee)}</span>
+          <span className="text-foreground">{formatUserDisplay(row.original.assignee)}</span>
         ),
       },
       {
         accessorKey: "creator",
         header: "Created By",
         cell: ({ row }) => (
-          <span className="text-slate-700">{formatUserDisplay(row.original.creator)}</span>
+          <span className="text-foreground">{formatUserDisplay(row.original.creator)}</span>
         ),
       },
       {
         accessorKey: "created_at",
         header: "Created",
         cell: ({ row }) => (
-          <span className="text-slate-600">{formatDateTime(row.original.created_at)}</span>
+          <span className="text-muted-foreground">{formatDateTime(row.original.created_at)}</span>
         ),
       },
     ],
@@ -592,20 +592,20 @@ export default function TicketsListPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Tickets</h1>
-          <p className="text-slate-600 mt-1">Manage support tickets for your active organization</p>
+          <h1 className="text-3xl font-semibold text-foreground">Tickets</h1>
+          <p className="text-muted-foreground mt-1">Manage support tickets for your active organization</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            className="gap-2 focus:ring-2 focus:ring-slate-900"
+            className="gap-2 focus:ring-2 focus:ring-ring"
             onClick={handleExportCsv}
           >
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
           <Button
-            className="gap-2 focus:ring-2 focus:ring-slate-900"
+            className="gap-2 focus:ring-2 focus:ring-ring"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <Plus className="w-4 h-4" />
@@ -623,7 +623,7 @@ export default function TicketsListPage() {
                 setFilters((prev) => ({ ...prev, search: event.target.value }))
               }
               placeholder="Search title or description..."
-              className="w-full sm:w-[260px] focus:ring-2 focus:ring-slate-900"
+              className="w-full sm:w-[260px] focus:ring-2 focus:ring-ring"
             />
             <Select
               value={filters.status}
@@ -634,7 +634,7 @@ export default function TicketsListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -655,7 +655,7 @@ export default function TicketsListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
@@ -676,7 +676,7 @@ export default function TicketsListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Assignee" />
               </SelectTrigger>
               <SelectContent>
@@ -698,7 +698,7 @@ export default function TicketsListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Org Role" />
               </SelectTrigger>
               <SelectContent>
@@ -719,7 +719,7 @@ export default function TicketsListPage() {
                 }))
               }
             >
-              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Customer" />
               </SelectTrigger>
               <SelectContent>
@@ -736,20 +736,20 @@ export default function TicketsListPage() {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-[220px] justify-between focus:ring-2 focus:ring-slate-900"
+                  className="w-[220px] justify-between focus:ring-2 focus:ring-ring"
                 >
                   <span className="truncate">
                     {formatTagFilterLabel(ticketTags, filters.tagIds)}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-slate-500" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[280px] p-0">
-                <div className="border-b border-slate-200 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Filter by tags
                 </div>
                 {ticketTags.length === 0 ? (
-                  <div className="px-3 py-3 text-sm text-slate-500">No tags created yet</div>
+                  <div className="px-3 py-3 text-sm text-muted-foreground">No tags created yet</div>
                 ) : (
                   <div className="max-h-56 space-y-1 overflow-y-auto px-3 py-2">
                     {ticketTags.map((tag) => {
@@ -757,7 +757,7 @@ export default function TicketsListPage() {
                       return (
                         <label
                           key={tag.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50"
+                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
                         >
                           <Checkbox
                             checked={checked}
@@ -770,14 +770,14 @@ export default function TicketsListPage() {
                               style={{ backgroundColor: tag.color }}
                             />
                           ) : null}
-                          {checked ? <Check className="h-3.5 w-3.5 text-slate-500" /> : null}
+                          {checked ? <Check className="h-3.5 w-3.5 text-muted-foreground" /> : null}
                         </label>
                       );
                     })}
                   </div>
                 )}
                 {filters.tagIds.length > 0 ? (
-                  <div className="border-t border-slate-200 p-2">
+                  <div className="border-t border-border p-2">
                     <Button
                       variant="ghost"
                       className="h-8 w-full justify-center text-xs"
@@ -801,7 +801,7 @@ export default function TicketsListPage() {
               onChange={(event) =>
                 setFilters((prev) => ({ ...prev, createdFrom: event.target.value }))
               }
-              className="w-[180px] focus:ring-2 focus:ring-slate-900"
+              className="w-[180px] focus:ring-2 focus:ring-ring"
             />
             <Input
               type="date"
@@ -809,13 +809,13 @@ export default function TicketsListPage() {
               onChange={(event) =>
                 setFilters((prev) => ({ ...prev, createdTo: event.target.value }))
               }
-              className="w-[180px] focus:ring-2 focus:ring-slate-900"
+              className="w-[180px] focus:ring-2 focus:ring-ring"
             />
           </div>
 
           <div className="flex items-center gap-2">
             <Select value={selectedViewId} onValueChange={handleApplySavedView}>
-              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[220px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Saved view" />
               </SelectTrigger>
               <SelectContent>
@@ -831,7 +831,7 @@ export default function TicketsListPage() {
               value={saveViewScope}
               onValueChange={(value) => setSaveViewScope(value as SavedViewScope)}
             >
-              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-slate-900">
+              <SelectTrigger className="w-[140px] focus:ring-2 focus:ring-ring">
                 <SelectValue placeholder="Scope" />
               </SelectTrigger>
               <SelectContent>
@@ -856,7 +856,7 @@ export default function TicketsListPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-10 text-center text-slate-500">
+        <div className="rounded-lg border border-border bg-background p-10 text-center text-muted-foreground">
           <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
           Loading tickets...
         </div>
@@ -1026,3 +1026,4 @@ export default function TicketsListPage() {
     </div>
   );
 }
+

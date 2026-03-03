@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -71,21 +72,28 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/40 to-background flex items-center justify-center p-4 py-12">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center">
-              <span className="font-bold text-white text-xl">OD</span>
+            <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-border bg-background">
+              <Image
+                src="/logo.webp"
+                alt="OpsDesk logo"
+                fill
+                className="object-cover"
+                sizes="48px"
+                priority
+              />
             </div>
-            <span className="text-2xl font-semibold text-slate-900">
+            <span className="text-2xl font-semibold text-foreground">
               OpsDesk
             </span>
           </div>
         </div>
 
-        <Card>
+        <Card className="border-border/70 bg-card/95 shadow-xl dark:bg-secondary/60">
           <CardHeader>
             <CardTitle>Create an account</CardTitle>
             <CardDescription>
@@ -110,7 +118,7 @@ export default function Page() {
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     disabled={loading}
-                    className="focus:ring-2 focus:ring-slate-900"
+                    className="focus:ring-2 focus:ring-ring"
                     required
                   />
                 </div>
@@ -122,7 +130,7 @@ export default function Page() {
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     disabled={loading}
-                    className="focus:ring-2 focus:ring-slate-900"
+                    className="focus:ring-2 focus:ring-ring"
                     required
                   />
                 </div>
@@ -136,7 +144,7 @@ export default function Page() {
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   disabled={loading}
-                  className="focus:ring-2 focus:ring-slate-900"
+                  className="focus:ring-2 focus:ring-ring"
                 />
               </div>
 
@@ -149,7 +157,7 @@ export default function Page() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
-                  className="focus:ring-2 focus:ring-slate-900"
+                  className="focus:ring-2 focus:ring-ring"
                   required
                 />
               </div>
@@ -162,7 +170,7 @@ export default function Page() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  className="focus:ring-2 focus:ring-slate-900"
+                  className="focus:ring-2 focus:ring-ring"
                   required
                   placeholder="At least 6 characters"
                   minLength={6}
@@ -177,7 +185,7 @@ export default function Page() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
-                  className="focus:ring-2 focus:ring-slate-900"
+                  className="focus:ring-2 focus:ring-ring"
                   required
                   placeholder="Confirm your password"
                   minLength={6}
@@ -186,7 +194,7 @@ export default function Page() {
 
               <Button
                 type="submit"
-                className="w-full focus:ring-2 focus:ring-slate-900"
+                className="w-full focus:ring-2 focus:ring-ring"
                 disabled={loading}
               >
                 {loading ? (
@@ -199,12 +207,12 @@ export default function Page() {
                 )}
               </Button>
 
-              <div className="text-center text-sm text-slate-500 mt-4">
+              <div className="text-center text-sm text-muted-foreground mt-4">
                 Already have an account?{" "}
                 <button
                   type="button"
                   onClick={() => router.push("/login")}
-                  className="text-slate-900 font-medium hover:underline"
+                  className="text-foreground font-medium hover:underline"
                 >
                   Sign in
                 </button>
@@ -212,10 +220,10 @@ export default function Page() {
 
               <div className="relative mt-4">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-slate-200" />
+                  <span className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-slate-500">
+                  <span className="bg-card px-2 text-muted-foreground">
                     Or continue with
                   </span>
                 </div>
@@ -224,7 +232,7 @@ export default function Page() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full focus:ring-2 focus:ring-slate-900 mt-4"
+                className="w-full focus:ring-2 focus:ring-ring mt-4"
                 disabled
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -254,3 +262,4 @@ export default function Page() {
     </div>
   );
 }
+

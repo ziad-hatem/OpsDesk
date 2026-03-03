@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -38,14 +39,21 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center">
-              <span className="font-bold text-white text-xl">OD</span>
+            <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-border bg-background">
+              <Image
+                src="/logo.webp"
+                alt="OpsDesk logo"
+                fill
+                className="object-cover"
+                sizes="48px"
+                priority
+              />
             </div>
-            <span className="text-2xl font-semibold text-slate-900">
+            <span className="text-2xl font-semibold text-foreground">
               OpsDesk
             </span>
           </div>
@@ -68,13 +76,13 @@ export default function Page() {
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Enter code"
                   required
-                  className="focus:ring-2 focus:ring-slate-900"
+                  className="focus:ring-2 focus:ring-ring"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full focus:ring-2 focus:ring-slate-900"
+                className="w-full focus:ring-2 focus:ring-ring"
               >
                 Verify code
               </Button>
@@ -96,12 +104,12 @@ export default function Page() {
               )}
             </form>
 
-            <div className="text-center text-sm text-slate-500 mt-4">
+            <div className="text-center text-sm text-muted-foreground mt-4">
               Already verified?{" "}
               <button
                 type="button"
                 onClick={() => router.push("/login")}
-                className="text-slate-900 font-medium hover:underline"
+                className="text-foreground font-medium hover:underline"
               >
                 Go to login
               </button>
@@ -112,3 +120,4 @@ export default function Page() {
     </div>
   );
 }
+

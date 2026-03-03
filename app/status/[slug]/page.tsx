@@ -51,7 +51,7 @@ function severityBadgeClass(severity: PublicStatusIncident["severity"]): string 
   if (severity === "medium") {
     return "bg-amber-100 text-amber-800 hover:bg-amber-100";
   }
-  return "bg-slate-100 text-slate-700 hover:bg-slate-100";
+  return "bg-muted text-foreground hover:bg-muted";
 }
 
 function statusBadgeClass(status: PublicStatusIncident["status"]): string {
@@ -129,13 +129,13 @@ export default function PublicStatusPage() {
   );
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
+    <main className="min-h-screen bg-muted/50 px-4 py-8 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <Card>
           <CardHeader className="gap-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <CardTitle className="text-3xl tracking-tight text-slate-900">
+                <CardTitle className="text-3xl tracking-tight text-foreground">
                   {data?.organization.name ?? "Status"}
                 </CardTitle>
                 <CardDescription className="mt-2 text-sm">
@@ -151,14 +151,14 @@ export default function PublicStatusPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0 text-sm text-slate-600">
+          <CardContent className="pt-0 text-sm text-muted-foreground">
             Last updated: {formatDateTime(data?.generated_at ?? null)}
           </CardContent>
         </Card>
 
         {isLoading ? (
           <Card>
-            <CardContent className="flex items-center gap-2 py-10 text-slate-600">
+            <CardContent className="flex items-center gap-2 py-10 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading status page...
             </CardContent>
@@ -183,25 +183,25 @@ export default function PublicStatusPage() {
               </CardHeader>
               <CardContent>
                 {data.services.length === 0 ? (
-                  <p className="text-sm text-slate-600">No public services configured.</p>
+                  <p className="text-sm text-muted-foreground">No public services configured.</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {data.services.map((service) => (
                       <div
                         key={service.id}
-                        className="rounded-lg border border-slate-200 bg-white p-4"
+                        className="rounded-lg border border-border bg-background p-4"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-900">{service.name}</p>
-                            <p className="mt-1 text-xs text-slate-500">{service.slug}</p>
+                            <p className="truncate font-medium text-foreground">{service.name}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{service.slug}</p>
                           </div>
                           <Badge className={healthBadgeClass(service.current_status)}>
                             {toTitleCase(service.current_status)}
                           </Badge>
                         </div>
                         {service.description ? (
-                          <p className="mt-3 text-sm text-slate-600">{service.description}</p>
+                          <p className="mt-3 text-sm text-muted-foreground">{service.description}</p>
                         ) : null}
                       </div>
                     ))}
@@ -222,11 +222,11 @@ export default function PublicStatusPage() {
               {activeIncidents.length > 0 ? (
                 <CardContent className="space-y-4">
                   {activeIncidents.map((incident) => (
-                    <div key={incident.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div key={incident.id} className="rounded-lg border border-border bg-background p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <p className="font-semibold text-slate-900">{incident.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="font-semibold text-foreground">{incident.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
                             Started {formatDateTime(incident.started_at)}
                           </p>
                         </div>
@@ -241,7 +241,7 @@ export default function PublicStatusPage() {
                       </div>
 
                       {incident.summary ? (
-                        <p className="mt-3 text-sm text-slate-700">{incident.summary}</p>
+                        <p className="mt-3 text-sm text-foreground">{incident.summary}</p>
                       ) : null}
 
                       {incident.impacts.length > 0 ? (
@@ -259,19 +259,19 @@ export default function PublicStatusPage() {
 
                       <div className="mt-4 space-y-2">
                         {incident.updates.length === 0 ? (
-                          <p className="text-sm text-slate-500">No timeline updates yet.</p>
+                          <p className="text-sm text-muted-foreground">No timeline updates yet.</p>
                         ) : (
                           incident.updates.map((update) => (
                             <div
                               key={update.id}
-                              className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                              className="rounded-md border border-border bg-muted/50 p-3"
                             >
-                              <div className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+                              <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
                                 <Clock3 className="h-3.5 w-3.5" />
                                 <span>{formatDateTime(update.created_at)}</span>
                                 {update.status ? <span>| {toTitleCase(update.status)}</span> : null}
                               </div>
-                              <p className="text-sm text-slate-700">{update.message}</p>
+                              <p className="text-sm text-foreground">{update.message}</p>
                             </div>
                           ))
                         )}
@@ -289,17 +289,17 @@ export default function PublicStatusPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {resolvedIncidents.length === 0 ? (
-                  <p className="text-sm text-slate-600">No resolved incidents yet.</p>
+                  <p className="text-sm text-muted-foreground">No resolved incidents yet.</p>
                 ) : (
                   resolvedIncidents.map((incident) => (
-                    <div key={incident.id} className="rounded-md border border-slate-200 p-3">
+                    <div key={incident.id} className="rounded-md border border-border p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="font-medium text-slate-900">{incident.title}</p>
+                        <p className="font-medium text-foreground">{incident.title}</p>
                         <Badge className={statusBadgeClass(incident.status)}>
                           {toTitleCase(incident.status)}
                         </Badge>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         Resolved {formatDateTime(incident.resolved_at)}
                       </p>
                     </div>

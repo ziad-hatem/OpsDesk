@@ -123,7 +123,7 @@ export default function CustomerDetailPage() {
     return (
       <div className="p-6">
         <Card>
-          <CardContent className="flex items-center justify-center py-12 text-slate-500">
+          <CardContent className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             Loading customer...
           </CardContent>
@@ -140,7 +140,7 @@ export default function CustomerDetailPage() {
           Back to Customers
         </Button>
         <Card>
-          <CardContent className="py-10 text-center text-slate-600">
+          <CardContent className="py-10 text-center text-muted-foreground">
             {error ?? "Customer not found."}
           </CardContent>
         </Card>
@@ -155,16 +155,16 @@ export default function CustomerDetailPage() {
           variant="outline"
           size="icon"
           onClick={() => router.push("/customers")}
-          className="focus:ring-2 focus:ring-slate-900"
+          className="focus:ring-2 focus:ring-ring"
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-semibold text-slate-900">{customer.name}</h1>
+            <h1 className="text-3xl font-semibold text-foreground">{customer.name}</h1>
             <StatusBadge status={customer.status} />
           </div>
-          <p className="text-slate-600 mt-1">Customer ID: {customer.id}</p>
+          <p className="text-muted-foreground mt-1">Customer ID: {customer.id}</p>
         </div>
       </div>
 
@@ -172,12 +172,12 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 rounded-lg">
-                <Mail className="w-5 h-5 text-slate-700" />
+              <div className="p-2 bg-muted rounded-lg">
+                <Mail className="w-5 h-5 text-foreground" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm text-slate-600">Email</p>
-                <p className="font-medium text-slate-900 break-all">{customer.email ?? "-"}</p>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium text-foreground break-all">{customer.email ?? "-"}</p>
               </div>
             </div>
           </CardContent>
@@ -185,12 +185,12 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 rounded-lg">
-                <Package className="w-5 h-5 text-slate-700" />
+              <div className="p-2 bg-muted rounded-lg">
+                <Package className="w-5 h-5 text-foreground" />
               </div>
               <div>
-                <p className="text-sm text-slate-600">Total Orders</p>
-                <p className="font-medium text-slate-900">{customer.total_orders_count}</p>
+                <p className="text-sm text-muted-foreground">Total Orders</p>
+                <p className="font-medium text-foreground">{customer.total_orders_count}</p>
               </div>
             </div>
           </CardContent>
@@ -198,12 +198,12 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 rounded-lg">
-                <DollarSign className="w-5 h-5 text-slate-700" />
+              <div className="p-2 bg-muted rounded-lg">
+                <DollarSign className="w-5 h-5 text-foreground" />
               </div>
               <div>
-                <p className="text-sm text-slate-600">Total Revenue</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="font-medium text-foreground">
                   {formatMoney(customer.total_revenue_amount, "USD")}
                 </p>
               </div>
@@ -213,12 +213,12 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 rounded-lg">
-                <TicketIcon className="w-5 h-5 text-slate-700" />
+              <div className="p-2 bg-muted rounded-lg">
+                <TicketIcon className="w-5 h-5 text-foreground" />
               </div>
               <div>
-                <p className="text-sm text-slate-600">Open Tickets</p>
-                <p className="font-medium text-slate-900">{customer.open_tickets_count}</p>
+                <p className="text-sm text-muted-foreground">Open Tickets</p>
+                <p className="font-medium text-foreground">{customer.open_tickets_count}</p>
               </div>
             </div>
           </CardContent>
@@ -241,38 +241,38 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Name</p>
-                <p className="font-medium text-slate-900">{customer.name}</p>
+                <p className="text-sm text-muted-foreground mb-1">Name</p>
+                <p className="font-medium text-foreground">{customer.name}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">Email</p>
-                <p className="font-medium text-slate-900 break-all">{customer.email ?? "-"}</p>
+                <p className="text-sm text-muted-foreground mb-1">Email</p>
+                <p className="font-medium text-foreground break-all">{customer.email ?? "-"}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">Open Tickets</p>
-                <p className="font-medium text-slate-900">{customer.open_tickets_count}</p>
+                <p className="text-sm text-muted-foreground mb-1">Open Tickets</p>
+                <p className="font-medium text-foreground">{customer.open_tickets_count}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">External ID</p>
-                <p className="font-medium text-slate-900">{customer.external_id ?? "-"}</p>
+                <p className="text-sm text-muted-foreground mb-1">External ID</p>
+                <p className="font-medium text-foreground">{customer.external_id ?? "-"}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">Total Orders</p>
-                <p className="font-medium text-slate-900">{customer.total_orders_count}</p>
+                <p className="text-sm text-muted-foreground mb-1">Total Orders</p>
+                <p className="font-medium text-foreground">{customer.total_orders_count}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">Total Revenue</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
+                <p className="font-medium text-foreground">
                   {formatMoney(customer.total_revenue_amount, "USD")}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">Created At</p>
-                <p className="font-medium text-slate-900">{formatDateTime(customer.created_at)}</p>
+                <p className="text-sm text-muted-foreground mb-1">Created At</p>
+                <p className="font-medium text-foreground">{formatDateTime(customer.created_at)}</p>
               </div>
               <div>
-                <p className="text-sm text-slate-600 mb-1">Updated At</p>
-                <p className="font-medium text-slate-900">{formatDateTime(customer.updated_at)}</p>
+                <p className="text-sm text-muted-foreground mb-1">Updated At</p>
+                <p className="font-medium text-foreground">{formatDateTime(customer.updated_at)}</p>
               </div>
             </CardContent>
           </Card>
@@ -283,18 +283,18 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               {incidents.length === 0 ? (
-                <p className="text-sm text-slate-500">No recent incidents in this organization.</p>
+                <p className="text-sm text-muted-foreground">No recent incidents in this organization.</p>
               ) : (
                 <div className="space-y-3">
                   {incidents.slice(0, 8).map((incident) => (
-                    <div key={incident.id} className="rounded-lg border border-slate-200 p-4">
+                    <div key={incident.id} className="rounded-lg border border-border p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-slate-500" />
-                        <p className="font-medium text-slate-900">{incident.title}</p>
+                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        <p className="font-medium text-foreground">{incident.title}</p>
                         <StatusBadge status={incident.status} />
                         <StatusBadge status={incident.severity} />
                       </div>
-                      <p className="mt-2 text-xs text-slate-600">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         Started: {formatDateTime(incident.started_at)}
                         {incident.resolved_at ? ` | Resolved: ${formatDateTime(incident.resolved_at)}` : ""}
                       </p>
@@ -313,23 +313,23 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               {communications.length === 0 ? (
-                <p className="text-sm text-slate-500">No communications recorded yet.</p>
+                <p className="text-sm text-muted-foreground">No communications recorded yet.</p>
               ) : (
                 <div className="space-y-4">
                   {communications.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-slate-200 p-4">
+                    <div key={item.id} className="rounded-lg border border-border p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <MessageCircle className="h-4 w-4 text-slate-500" />
+                        <MessageCircle className="h-4 w-4 text-muted-foreground" />
                         <Badge variant="outline">{channelLabel(item.channel)}</Badge>
                         <Badge variant={item.direction === "inbound" ? "secondary" : "default"}>
                           {item.direction === "inbound" ? "Inbound" : "Outbound"}
                         </Badge>
                         {item.subject ? (
-                          <p className="text-sm font-medium text-slate-900">{item.subject}</p>
+                          <p className="text-sm font-medium text-foreground">{item.subject}</p>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-sm text-slate-800 whitespace-pre-wrap">{item.preview}</p>
-                      <div className="mt-2 flex flex-wrap items-center text-xs text-slate-600 gap-2">
+                      <p className="mt-2 text-sm text-foreground whitespace-pre-wrap">{item.preview}</p>
+                      <div className="mt-2 flex flex-wrap items-center text-xs text-muted-foreground gap-2">
                         <span>{formatDateTime(item.occurred_at)}</span>
                         {item.actor ? <span>By {item.actor.name ?? item.actor.email}</span> : null}
                         {item.sender_email || item.sender_phone ? (
@@ -356,13 +356,13 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               {activity.length === 0 ? (
-                <p className="text-sm text-slate-500">No activity found for this customer.</p>
+                <p className="text-sm text-muted-foreground">No activity found for this customer.</p>
               ) : (
                 <div className="space-y-4">
                   {activity.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-slate-200 p-4">
+                    <div key={item.id} className="rounded-lg border border-border p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-slate-900">{item.title}</p>
+                        <p className="font-medium text-foreground">{item.title}</p>
                         {item.kind === "communication" && item.channel ? (
                           <Badge variant="outline">{channelLabel(item.channel)}</Badge>
                         ) : null}
@@ -373,9 +373,9 @@ export default function CustomerDetailPage() {
                         ) : null}
                       </div>
                       {item.preview ? (
-                        <p className="mt-2 text-sm text-slate-700">{item.preview}</p>
+                        <p className="mt-2 text-sm text-foreground">{item.preview}</p>
                       ) : null}
-                      <div className="mt-2 flex flex-wrap items-center text-xs text-slate-600">
+                      <div className="mt-2 flex flex-wrap items-center text-xs text-muted-foreground">
                         <span>{formatDateTime(item.occurred_at)}</span>
                         <Dot className="h-4 w-4" />
                         <span>{item.actor?.name ?? item.actor?.email ?? "System"}</span>
@@ -395,19 +395,19 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               {tickets.length === 0 ? (
-                <p className="text-sm text-slate-500">No tickets linked to this customer.</p>
+                <p className="text-sm text-muted-foreground">No tickets linked to this customer.</p>
               ) : (
                 <div className="space-y-4">
                   {tickets.map((ticket) => (
                     <div
                       key={ticket.id}
-                      className="flex items-start justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
+                      className="flex items-start justify-between p-4 border border-border rounded-lg hover:bg-muted/50 cursor-pointer"
                       onClick={() => router.push(`/tickets/${ticket.id}`)}
                     >
                       <div className="flex-1">
-                        <p className="font-medium text-slate-900">{toTicketCode(ticket.id)}</p>
-                        <p className="text-sm text-slate-700 mt-1">{ticket.title}</p>
-                        <p className="text-xs text-slate-600 mt-2">
+                        <p className="font-medium text-foreground">{toTicketCode(ticket.id)}</p>
+                        <p className="text-sm text-foreground mt-1">{ticket.title}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
                           Created: {formatDateTime(ticket.created_at)}
                         </p>
                       </div>
@@ -435,18 +435,18 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               {orders.length === 0 ? (
-                <p className="text-sm text-slate-500">No orders linked to this customer.</p>
+                <p className="text-sm text-muted-foreground">No orders linked to this customer.</p>
               ) : (
                 <div className="space-y-4">
                   {orders.map((order) => (
                     <div
                       key={order.id}
-                      className="flex items-start justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer"
+                      className="flex items-start justify-between p-4 border border-border rounded-lg hover:bg-muted/50 cursor-pointer"
                       onClick={() => router.push(`/orders/${order.id}`)}
                     >
                       <div className="flex-1">
-                        <p className="font-medium text-slate-900">{order.order_number}</p>
-                        <p className="text-xs text-slate-600 mt-2">
+                        <p className="font-medium text-foreground">{order.order_number}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
                           Created: {formatDateTime(order.created_at)}
                         </p>
                       </div>

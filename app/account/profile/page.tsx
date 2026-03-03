@@ -860,11 +860,11 @@ export default function AccountProfilePage() {
 
   return (
     <div className="w-full space-y-8 p-6 lg:p-8">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+      <div className="rounded-2xl border border-border bg-background p-5 shadow-sm lg:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Account Profile</h1>
-            <p className="mt-1 text-slate-600">
+            <h1 className="text-3xl font-semibold text-foreground">Account Profile</h1>
+            <p className="mt-1 text-muted-foreground">
               Manage your identity, personal details, security, and account lifecycle.
             </p>
           </div>
@@ -883,11 +883,11 @@ export default function AccountProfilePage() {
       </div>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Profile and Identity
         </p>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="border-slate-200 shadow-sm lg:col-span-1">
+          <Card className="border-border shadow-sm lg:col-span-1">
           <CardHeader>
             <CardTitle>Profile Picture</CardTitle>
             <CardDescription>
@@ -897,9 +897,9 @@ export default function AccountProfilePage() {
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center text-center gap-3">
               <div className="relative">
-                <Avatar className="h-28 w-28 border border-slate-200">
+                <Avatar className="h-28 w-28 border border-border">
                   <AvatarImage src={profileForm.avatarUrl || undefined} alt="Profile avatar" />
-                  <AvatarFallback className="text-lg font-medium text-slate-700">
+                  <AvatarFallback className="text-lg font-medium text-foreground">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -907,7 +907,7 @@ export default function AccountProfilePage() {
                   type="button"
                   onClick={handleAvatarSelect}
                   disabled={disableActions}
-                  className="absolute -bottom-2 -right-2 rounded-full bg-slate-900 p-2 text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="absolute -bottom-2 -right-2 rounded-full bg-primary p-2 text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label="Upload avatar"
                 >
                   {isUploadingAvatar ? (
@@ -959,14 +959,14 @@ export default function AccountProfilePage() {
                 }
                 disabled={disableActions}
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 You can upload a file or paste an image URL. Max upload size is 2MB.
               </p>
             </div>
           </CardContent>
           </Card>
 
-          <Card className="border-slate-200 shadow-sm lg:col-span-2">
+          <Card className="border-border shadow-sm lg:col-span-2">
           <CardHeader>
             <CardTitle>Personal Details</CardTitle>
             <CardDescription>
@@ -1031,7 +1031,7 @@ export default function AccountProfilePage() {
                   }
                   disabled={disableActions}
                 >
-                  <SelectTrigger id="timezone" className="focus:ring-2 focus:ring-slate-900">
+                  <SelectTrigger id="timezone" className="focus:ring-2 focus-visible:ring-ring">
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
@@ -1093,8 +1093,8 @@ export default function AccountProfilePage() {
               />
             </div>
 
-            <div className="flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
-              <div className="text-sm text-slate-500 flex items-center gap-2">
+            <div className="flex flex-wrap justify-between gap-3 border-t border-border/60 pt-4">
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <UserRound className="h-4 w-4" />
                 User ID: <span className="font-mono">{profileUserId || "-"}</span>
               </div>
@@ -1130,10 +1130,10 @@ export default function AccountProfilePage() {
       </section>
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Security and Access
         </p>
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-border shadow-sm">
         <CardHeader>
           <CardTitle>Security</CardTitle>
           <CardDescription>
@@ -1187,16 +1187,16 @@ export default function AccountProfilePage() {
             </Button>
           </div>
 
-          <div className="border-t border-slate-100 pt-5 space-y-4">
-            <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2.5">
+          <div className="border-t border-border/60 pt-5 space-y-4">
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-900">Multi-Step Authentication</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-foreground">Multi-Step Authentication</p>
+                <p className="text-xs text-muted-foreground">
                   Require an email verification code after first-step sign-in.
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-muted-foreground">
                   {isMultiStepAuthEnabled ? "Enabled" : "Disabled"}
                 </span>
                 <Switch
@@ -1210,8 +1210,8 @@ export default function AccountProfilePage() {
 
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-slate-900">Passwordless Sign-In</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-foreground">Passwordless Sign-In</p>
+                <p className="text-xs text-muted-foreground">
                   Send login links to your email and register passkeys for faster sign-in.
                 </p>
               </div>
@@ -1234,9 +1234,9 @@ export default function AccountProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="md:col-span-2 space-y-2">
                 <Label htmlFor="passkey-name">Passkey Name</Label>
-                <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm">
+                <div className="rounded-xl border border-border bg-gradient-to-br from-background to-muted/60 p-3 shadow-sm">
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground">
                       <KeyRound className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1 space-y-1.5">
@@ -1246,16 +1246,16 @@ export default function AccountProfilePage() {
                         onChange={(event) => setPasskeyFriendlyName(event.target.value)}
                         placeholder="My Laptop Passkey"
                         disabled={disableActions || isRegisteringPasskey}
-                        className="h-11 border-slate-300 bg-white text-sm font-medium shadow-none focus-visible:border-slate-400 focus-visible:ring-2 focus-visible:ring-slate-200"
+                        className="h-11 border-border bg-background text-sm font-medium shadow-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                       />
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         Use a recognizable device label like Work Laptop or
                         iPhone 16 Pro.
                       </p>
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   On desktop, choose your phone/tablet from the browser passkey prompt.
                   Keep Bluetooth enabled for cross-device setup.
                 </p>
@@ -1287,7 +1287,7 @@ export default function AccountProfilePage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-900">Registered Passkeys</p>
+                <p className="text-sm font-medium text-foreground">Registered Passkeys</p>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1302,19 +1302,19 @@ export default function AccountProfilePage() {
                 </Button>
               </div>
               {passkeys.length === 0 ? (
-                <p className="text-xs text-slate-500">No passkeys registered yet.</p>
+                <p className="text-xs text-muted-foreground">No passkeys registered yet.</p>
               ) : (
                 <div className="space-y-2">
                   {passkeys.map((factor) => (
                     <div
                       key={factor.id}
-                      className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2"
+                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
                     >
                       <div>
-                        <p className="text-sm font-medium text-slate-900">
+                        <p className="text-sm font-medium text-foreground">
                           {getPasskeyDisplayName(factor)}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           Added {new Date(factor.createdAt).toLocaleString()}
                         </p>
                       </div>
@@ -1442,7 +1442,7 @@ export default function AccountProfilePage() {
       </section>
 
       {isLoading ? (
-        <div className="flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
+        <div className="flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           Loading profile...
         </div>
@@ -1466,8 +1466,8 @@ export default function AccountProfilePage() {
           <div className="space-y-4">
             <div className="mx-auto">
               <div
-                className={`h-36 w-36 overflow-hidden rounded-full border border-slate-200 ${
-                  avatarSaveMode === "square_fit" ? "bg-slate-50" : "bg-white"
+                className={`h-36 w-36 overflow-hidden rounded-full border border-border ${
+                  avatarSaveMode === "square_fit" ? "bg-muted/50" : "bg-background"
                 }`}
               >
                 {pendingAvatarPreviewUrl ? (
@@ -1490,12 +1490,12 @@ export default function AccountProfilePage() {
             >
               <label
                 htmlFor="avatar-mode-square-crop"
-                className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50"
+                className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 hover:bg-muted/50"
               >
                 <RadioGroupItem id="avatar-mode-square-crop" value="square_crop" />
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Square Crop (Recommended)</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-medium text-foreground">Square Crop (Recommended)</p>
+                  <p className="text-xs text-muted-foreground">
                     Center crop to a clean square and optimize size.
                   </p>
                 </div>
@@ -1503,12 +1503,12 @@ export default function AccountProfilePage() {
 
               <label
                 htmlFor="avatar-mode-square-fit"
-                className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50"
+                className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 hover:bg-muted/50"
               >
                 <RadioGroupItem id="avatar-mode-square-fit" value="square_fit" />
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Fit in Square</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-medium text-foreground">Fit in Square</p>
+                  <p className="text-xs text-muted-foreground">
                     Keep full image visible with soft background padding.
                   </p>
                 </div>
@@ -1516,12 +1516,12 @@ export default function AccountProfilePage() {
 
               <label
                 htmlFor="avatar-mode-original"
-                className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50"
+                className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 hover:bg-muted/50"
               >
                 <RadioGroupItem id="avatar-mode-original" value="original" />
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Keep Original</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-medium text-foreground">Keep Original</p>
+                  <p className="text-xs text-muted-foreground">
                     Upload the exact selected file without processing.
                   </p>
                 </div>
@@ -1549,3 +1549,4 @@ export default function AccountProfilePage() {
     </div>
   );
 }
+
