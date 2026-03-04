@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "next-sitemap",
+    "sitemap": "next-sitemap",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -100,6 +102,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "jsdom": "^28.1.0",
+    "next-sitemap": "^4.2.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.18"

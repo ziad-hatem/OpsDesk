@@ -204,12 +204,14 @@ Use `.env.local`. The following variables directly affect frontend behavior and 
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Feature-dependent | Email flows (magic link, MFA code, invite/report mailers) |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Feature-dependent | Portal payment/session handling |
 | `PASSKEY_*` vars | Optional | Passkey RP/origin overrides |
+| `SITEMAP_STATUS_SLUGS` | Optional | Comma-separated public status slugs to include in sitemap (for `/status/[slug]`) |
 
 ## Scripts
 
 ```bash
 npm run dev
 npm run build
+npm run sitemap
 npm run start
 npm run lint
 npm run test
@@ -219,6 +221,8 @@ npm run test:components
 npm run test:e2e
 npm run test:e2e:headed
 ```
+
+`npm run build` now runs `next-sitemap` automatically via `postbuild` and emits `public/sitemap.xml`, `public/sitemap-0.xml`, and `public/robots.txt`.
 
 ## Testing Strategy
 

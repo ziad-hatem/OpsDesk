@@ -176,6 +176,8 @@ export default function Page() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaTargetEmail, setMfaTargetEmail] = useState<string | null>(null);
   const [mfaInfo, setMfaInfo] = useState("");
+  const [magicLinkTargetEmail, setMagicLinkTargetEmail] = useState<string | null>(null);
+  const [magicLinkInfo, setMagicLinkInfo] = useState("");
   const [error, setError] = useState("");
   const [isVerified, setIsVerified] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -476,7 +478,10 @@ export default function Page() {
         throw new Error(data.error ?? "Failed to send magic link");
       }
 
-      toast.success(data.message ?? "Check your email for a sign-in link.");
+      const successMessage = data.message ?? "Check your email for a sign-in link.";
+      setMagicLinkTargetEmail(nextEmail);
+      setMagicLinkInfo(successMessage);
+      toast.success(successMessage);
     } catch (sendError: unknown) {
       const message =
         sendError instanceof Error
@@ -671,6 +676,48 @@ export default function Page() {
                 </Button>
               </CardContent>
             </>
+          ) : magicLinkTargetEmail ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+              <CardTitle className="text-xl">Check your inbox</CardTitle>
+              <CardDescription className="mt-2">
+                {magicLinkInfo || "A sign-in link has been sent to your email."}
+              </CardDescription>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Sent to{" "}
+                <span className="font-medium text-foreground">{magicLinkTargetEmail}</span>
+              </p>
+
+              <div className="mt-6 grid w-full gap-2">
+                <Button
+                  type="button"
+                  onClick={handleSendMagicLink}
+                  disabled={isSendingMagicLink}
+                >
+                  {isSendingMagicLink ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending link...
+                    </>
+                  ) : (
+                    "Send again"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setMagicLinkTargetEmail(null);
+                    setMagicLinkInfo("");
+                  }}
+                  disabled={isSendingMagicLink}
+                >
+                  Back to sign-in methods
+                </Button>
+              </div>
+            </div>
           ) : (
             <>
               <CardHeader className="space-y-2">
