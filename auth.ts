@@ -5,6 +5,7 @@ import { supabase } from "./lib/supabase";
 import { createSupabaseAdminClient } from "./lib/supabase-admin";
 import { loadMembershipAccessSummary } from "./lib/server/membership-access";
 import { verifyMfaAssertionToken } from "./lib/server/mfa-assertion";
+import { verifyPasskeyAssertionToken } from "./lib/server/passkey-assertion";
 
 class InvalidCredentials extends CredentialsSignin {
   code = "Invalid email or password";
@@ -16,6 +17,10 @@ class SuspendedAccount extends CredentialsSignin {
 
 class MfaRequired extends CredentialsSignin {
   code = "mfa_required";
+}
+
+class InvalidPasskeyAssertion extends CredentialsSignin {
+  code = "invalid_passkey_assertion";
 }
 
 function isMultiStepAuthEnabled(metadata: unknown): boolean {
@@ -138,6 +143,55 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: fullName || data.user.user_metadata?.name || null,
           image:
             (data.user.user_metadata?.avatar_url as string | undefined) ?? null,
+        };
+      },
+    }),
+    CredentialsProvider({
+      id: "passkey-assertion",
+      name: "Passkey Assertion",
+      credentials: {
+        assertionToken: { label: "Assertion Token", type: "text" },
+      },
+      async authorize(credentials) {
+        const assertionToken =
+          typeof credentials?.assertionToken === "string"
+            ? credentials.assertionToken.trim()
+            : "";
+        if (!assertionToken) {
+          return null;
+        }
+
+        const assertion = verifyPasskeyAssertionToken({
+          token: assertionToken,
+        });
+        if (!assertion?.userId) {
+          throw new InvalidPasskeyAssertion();
+        }
+
+        const supabaseAdmin = createSupabaseAdminClient();
+        const { data: authUserResult, error: authUserError } =
+          await supabaseAdmin.auth.admin.getUserById(assertion.userId);
+        if (authUserError || !authUserResult.user?.email) {
+          throw new InvalidPasskeyAssertion();
+        }
+
+        const authUser = authUserResult.user;
+        await assertHasActiveMembership(authUser.id);
+
+        const firstName = authUser.user_metadata?.first_name as
+          | string
+          | undefined;
+        const lastName = authUser.user_metadata?.last_name as
+          | string
+          | undefined;
+        const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+        return {
+          id: authUser.id,
+          email: authUser.email,
+          name: fullName || authUser.user_metadata?.name || null,
+          image:
+            (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
         };
       },
     }),

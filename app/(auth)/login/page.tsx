@@ -18,7 +18,6 @@ import {
 } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../components/ui/input-otp";
 import { hasVerifiedQuery, mapLoginError } from "./login-flow";
 import { passkeyEndpoints } from "@/lib/passkey-endpoints";
@@ -47,7 +46,18 @@ type MfaVerifyResponse = {
   error?: string;
 };
 
-type SignInMode = "password" | "magic-link";
+type PasskeyLookupResponse = {
+  hasPasskey?: boolean;
+  userId?: string | null;
+};
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isEmailFormat(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function isMultiStepAuthEnabled(metadata: unknown): boolean {
   if (!metadata || typeof metadata !== "object") {
@@ -101,6 +111,10 @@ function mapPasskeyRuntimeError(error: unknown): string {
     return "This browser/device cannot use passkeys for this site. Update browser and ensure HTTPS.";
   }
 
+  if (normalized.includes("credential not found")) {
+    return "No matching passkey was found for this email. Confirm the email or use password/magic link.";
+  }
+
   return raw;
 }
 
@@ -147,12 +161,15 @@ async function verifyMfaCode(params: {
 export default function Page() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<SignInMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSendingMagicLink, setIsSendingMagicLink] = useState(false);
   const [isSigningInWithPasskey, setIsSigningInWithPasskey] = useState(false);
+  const [isCheckingPasskey, setIsCheckingPasskey] = useState(false);
+  const [hasRegisteredPasskey, setHasRegisteredPasskey] = useState(false);
+  const [passkeyUserId, setPasskeyUserId] = useState<string | null>(null);
+  const [passkeyLookupEmail, setPasskeyLookupEmail] = useState<string>("");
   const [isSendingMfaCode, setIsSendingMfaCode] = useState(false);
   const [isVerifyingMfaCode, setIsVerifyingMfaCode] = useState(false);
   const [requiresMfa, setRequiresMfa] = useState(false);
@@ -165,6 +182,8 @@ export default function Page() {
   const { authenticate: authenticatePasskey } = useAuthenticatePasskey({
     endpoints: passkeyEndpoints,
   });
+  const normalizedEmail = normalizeEmail(email);
+  const hasValidEmail = isEmailFormat(normalizedEmail);
 
   const disableLoginActions =
     loading ||
@@ -197,6 +216,62 @@ export default function Page() {
   }, [searchParams]);
 
   useEffect(() => {
+    setHasRegisteredPasskey(false);
+    setPasskeyUserId(null);
+    setPasskeyLookupEmail("");
+
+    if (!hasValidEmail) {
+      setIsCheckingPasskey(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setIsCheckingPasskey(true);
+      try {
+        const response = await fetch("/api/auth/passkey/lookup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: normalizedEmail }),
+          signal: controller.signal,
+        });
+
+        const payload = (await response.json()) as PasskeyLookupResponse;
+        const discoveredUserId =
+          typeof payload.userId === "string" ? payload.userId.trim() : "";
+        const available =
+          response.ok &&
+          payload.hasPasskey === true &&
+          discoveredUserId.length > 0;
+
+        setHasRegisteredPasskey(available);
+        setPasskeyUserId(available ? discoveredUserId : null);
+        setPasskeyLookupEmail(normalizedEmail);
+      } catch (lookupError: unknown) {
+        if (
+          lookupError instanceof Error &&
+          lookupError.name === "AbortError"
+        ) {
+          return;
+        }
+        setHasRegisteredPasskey(false);
+        setPasskeyUserId(null);
+        setPasskeyLookupEmail("");
+      } finally {
+        setIsCheckingPasskey(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+      setIsCheckingPasskey(false);
+    };
+  }, [hasValidEmail, normalizedEmail]);
+
+  useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isVerified && countdown > 0) {
       timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
@@ -207,7 +282,7 @@ export default function Page() {
     return () => clearTimeout(timer);
   }, [isVerified, countdown, router]);
 
-  const runPasskeyChallenge = async (userId: string): Promise<void> => {
+  const runPasskeyChallenge = async (userId: string): Promise<string> => {
     if (typeof window === "undefined" || !("PublicKeyCredential" in window)) {
       throw new Error("Passkeys are not supported in this browser");
     }
@@ -222,6 +297,8 @@ export default function Page() {
     if (!result.verified || !result.assertionToken) {
       throw new Error("Passkey authentication was not verified.");
     }
+
+    return result.assertionToken;
   };
 
   const getSessionTokens = async () => {
@@ -276,18 +353,20 @@ export default function Page() {
     setLoading(true);
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const { data, error: supabaseError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
-      });
+      const nextEmail = normalizeEmail(email);
+      const { data, error: supabaseError } = await supabase.auth.signInWithPassword(
+        {
+          email: nextEmail,
+          password,
+        },
+      );
 
       if (supabaseError || !data.user) {
         throw new Error(mapPasswordSignInError(supabaseError));
       }
 
       if (isMultiStepAuthEnabled(data.user.user_metadata)) {
-        await startMfaStep(normalizedEmail);
+        await startMfaStep(nextEmail);
         return;
       }
 
@@ -369,9 +448,14 @@ export default function Page() {
   };
 
   const handleSendMagicLink = async () => {
-    const normalizedEmail = email.trim();
-    if (!normalizedEmail) {
+    const nextEmail = normalizeEmail(email);
+    if (!nextEmail) {
       setError("Enter your email to receive a magic link");
+      return;
+    }
+
+    if (!isEmailFormat(nextEmail)) {
+      setError("Enter a valid email address to receive a magic link");
       return;
     }
 
@@ -384,7 +468,7 @@ export default function Page() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({ email: nextEmail }),
       });
 
       const data = (await response.json()) as { message?: string; error?: string };
@@ -408,6 +492,26 @@ export default function Page() {
   const handlePasskeySignIn = async () => {
     setError("");
 
+    if (!hasValidEmail) {
+      setError("Enter a valid email to continue with passkey.");
+      return;
+    }
+
+    if (isCheckingPasskey) {
+      setError("Checking passkey availability. Try again in a moment.");
+      return;
+    }
+
+    if (passkeyLookupEmail !== normalizedEmail) {
+      setError("Checking passkey availability. Try again in a moment.");
+      return;
+    }
+
+    if (!hasRegisteredPasskey || !passkeyUserId) {
+      setError("No registered passkey was found for this email.");
+      return;
+    }
+
     if (typeof window === "undefined" || !("PublicKeyCredential" in window)) {
       setError("Passkeys are not supported in this browser");
       return;
@@ -420,17 +524,16 @@ export default function Page() {
     setIsSigningInWithPasskey(true);
 
     try {
-      const { data: existingSessionData } = await supabase.auth.getSession();
-      if (!existingSessionData.session) {
-        throw new Error(
-          "No local auth session found. Sign in once with password or magic link first.",
-        );
+      const assertionToken = await runPasskeyChallenge(passkeyUserId);
+      const result = (await signIn("passkey-assertion", {
+        redirect: false,
+        assertionToken,
+      })) as SignInResultWithCode | undefined;
+
+      if (result?.error) {
+        throw new Error(mapLoginError(result.error, readAuthErrorCode(result)));
       }
 
-      await runPasskeyChallenge(
-        existingSessionData.session.user.id,
-      );
-      await finalizeSessionSignIn();
       toast.success("Signed in with passkey");
       router.push("/");
     } catch (passkeyError: unknown) {
@@ -439,13 +542,6 @@ export default function Page() {
       toast.error(message);
     } finally {
       setIsSigningInWithPasskey(false);
-    }
-  };
-
-  const handleModeChange = (value: string) => {
-    if (value === "password" || value === "magic-link") {
-      setMode(value);
-      setError("");
     }
   };
 
@@ -605,104 +701,107 @@ export default function Page() {
                   />
                 </div>
 
-                <Tabs value={mode} onValueChange={handleModeChange} className="w-full">
-                  <TabsList className="w-full">
-                    <TabsTrigger value="password">Password</TabsTrigger>
-                    <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="password" className="mt-4">
-                    <form onSubmit={handlePasswordSignIn} className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          value={password}
-                          onChange={(event) => setPassword(event.target.value)}
-                          disabled={disableLoginActions}
-                          className="focus:ring-2 focus:ring-ring"
-                          required
-                        />
-                        <div className="text-right">
-                          <button
-                            type="button"
-                            onClick={() => router.push("/forgot-password")}
-                            className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
-                            disabled={disableLoginActions}
-                          >
-                            Forgot password?
-                          </button>
-                        </div>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        className="w-full focus:ring-2 focus:ring-ring"
+                <form onSubmit={handlePasswordSignIn} className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      disabled={disableLoginActions}
+                      className="focus:ring-2 focus:ring-ring"
+                      required
+                    />
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => router.push("/forgot-password")}
+                        className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
                         disabled={disableLoginActions}
                       >
-                        {loading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Signing in...
-                          </>
-                        ) : (
-                          "Sign In"
-                        )}
-                      </Button>
-                    </form>
-                  </TabsContent>
+                        Forgot password?
+                      </button>
+                    </div>
+                  </div>
 
-                  <TabsContent value="magic-link" className="mt-4 space-y-3">
-                    <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                      We will email you a secure sign-in link.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleSendMagicLink}
-                      disabled={disableLoginActions}
-                    >
-                      {isSendingMagicLink ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Sending link...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="mr-2 h-4 w-4" />
-                          Send Magic Link
-                        </>
-                      )}
-                    </Button>
-                  </TabsContent>
-                </Tabs>
+                  <Button
+                    type="submit"
+                    className="w-full focus:ring-2 focus:ring-ring"
+                    disabled={disableLoginActions}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      "Sign In"
+                    )}
+                  </Button>
+                </form>
 
                 <div className="space-y-3 border-t border-border pt-4">
+                  <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    Prefer passwordless sign-in? We can email you a secure magic link.
+                  </p>
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full"
-                    onClick={handlePasskeySignIn}
+                    onClick={handleSendMagicLink}
                     disabled={disableLoginActions}
                   >
-                    {isSigningInWithPasskey ? (
+                    {isSendingMagicLink ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Checking passkey...
+                        Sending link...
                       </>
                     ) : (
                       <>
-                        <KeyRound className="mr-2 h-4 w-4" />
-                        Continue with Passkey
+                        <Mail className="mr-2 h-4 w-4" />
+                        Send Magic Link
                       </>
                     )}
                   </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Passkey sign-in requires an existing local session on this device.
-                  </p>
                 </div>
+
+                {hasValidEmail ? (
+                  <div className="space-y-2 border-t border-border pt-4">
+                    {isCheckingPasskey ? (
+                      <p className="text-xs text-muted-foreground">
+                        Checking for a registered passkey...
+                      </p>
+                    ) : null}
+
+                    {hasRegisteredPasskey ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={handlePasskeySignIn}
+                          disabled={disableLoginActions || isCheckingPasskey}
+                        >
+                          {isSigningInWithPasskey ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Checking passkey...
+                            </>
+                          ) : (
+                            <>
+                              <KeyRound className="mr-2 h-4 w-4" />
+                              Continue with Passkey
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Passkey found for this email.
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <p className="text-center text-sm text-muted-foreground">
                   Don&apos;t have an account?{" "}

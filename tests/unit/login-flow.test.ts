@@ -16,6 +16,18 @@ describe("login-flow helpers", () => {
   });
 
   describe("mapLoginError", () => {
+    it("maps account_suspended code to a user-facing message", () => {
+      expect(mapLoginError("CredentialsSignin", "account_suspended")).toBe(
+        "Your account is suspended. Contact your organization admin.",
+      );
+    });
+
+    it("maps invalid_passkey_assertion code to a passkey retry message", () => {
+      expect(mapLoginError("CredentialsSignin", "invalid_passkey_assertion")).toBe(
+        "Passkey verification expired. Try signing in with passkey again.",
+      );
+    });
+
     it("maps CredentialsSignin to a user-facing message", () => {
       expect(mapLoginError("CredentialsSignin")).toBe(
         "Invalid email or password",

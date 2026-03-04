@@ -11,6 +11,10 @@ export function mapLoginError(errorMessage: string, code?: string | null): strin
     return "Multi-step authentication is enabled. Enter the email verification code to continue.";
   }
 
+  if (code === "invalid_passkey_assertion") {
+    return "Passkey verification expired. Try signing in with passkey again.";
+  }
+
   if (errorMessage === "CredentialsSignin") {
     return "Invalid email or password";
   }

@@ -40,8 +40,8 @@ export function createPasskeyAssertionToken(params: {
 
 export function verifyPasskeyAssertionToken(params: {
   token: string;
-  expectedUserId: string;
-}): { credentialId: string } | null {
+  expectedUserId?: string;
+}): { userId: string; credentialId: string } | null {
   try {
     const decoded = jwt.verify(
       params.token,
@@ -50,7 +50,9 @@ export function verifyPasskeyAssertionToken(params: {
 
     if (
       decoded.type !== PASSKEY_ASSERTION_TYPE ||
-      decoded.sub !== params.expectedUserId ||
+      (params.expectedUserId && decoded.sub !== params.expectedUserId) ||
+      typeof decoded.sub !== "string" ||
+      !decoded.sub.trim() ||
       typeof decoded.credentialId !== "string" ||
       !decoded.credentialId.trim()
     ) {
@@ -58,10 +60,10 @@ export function verifyPasskeyAssertionToken(params: {
     }
 
     return {
+      userId: decoded.sub,
       credentialId: decoded.credentialId,
     };
   } catch {
     return null;
   }
 }
-
