@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { ACTIVE_ORG_COOKIE } from "@/lib/topbar/constants";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 type MembershipRow = {
   organization_id: string;
@@ -54,10 +55,7 @@ export async function getTicketRequestContext(): Promise<
       id: session.user.id,
       email: authEmail,
       name: fullName || fallbackName,
-      avatar_url:
-        typeof authUser.user_metadata?.avatar_url === "string"
-          ? authUser.user_metadata.avatar_url
-          : null,
+      avatar_url: normalizeAvatarUrl(authUser.user_metadata?.avatar_url),
     },
     { onConflict: "id" },
   );

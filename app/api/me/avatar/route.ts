@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 type UserRow = {
   id: string;
@@ -130,7 +131,7 @@ export async function POST(req: Request) {
         id: session.user.id,
         name: session.user.name ?? null,
         email: session.user.email,
-        avatar_url: session.user.image ?? null,
+        avatar_url: normalizeAvatarUrl(session.user.image),
       });
 
       if (insertError) {

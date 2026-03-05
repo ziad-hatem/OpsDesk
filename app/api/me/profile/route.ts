@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 type UserRow = {
   id: string;
@@ -78,6 +79,7 @@ async function ensureUserRow(params: {
   fallbackAvatarUrl: string | null;
 }): Promise<{ user: UserRow | null; error: string | null }> {
   const { supabase, userId, fallbackName, fallbackEmail, fallbackAvatarUrl } = params;
+  const safeFallbackAvatarUrl = normalizeAvatarUrl(fallbackAvatarUrl);
 
   const { data: existingUser, error: existingUserError } = await supabase
     .from("users")
@@ -103,7 +105,7 @@ async function ensureUserRow(params: {
     id: userId,
     name: fallbackName,
     email: fallbackEmail,
-    avatar_url: fallbackAvatarUrl,
+    avatar_url: safeFallbackAvatarUrl,
   });
 
   if (insertError) {
@@ -222,7 +224,8 @@ export async function PATCH(req: Request) {
 
   const name = hasName ? normalizeOptionalText(body.name, 150) : null;
   const email = hasEmail ? normalizeEmail(body.email) : null;
-  const avatarUrl = hasAvatarUrl ? normalizeOptionalText(body.avatarUrl, 2000) : null;
+  const avatarUrlInput = hasAvatarUrl ? body.avatarUrl : undefined;
+  const avatarUrl = hasAvatarUrl ? normalizeAvatarUrl(avatarUrlInput) : null;
   const phone = hasPhone ? normalizeOptionalText(body.phone, 60) : null;
   const title = hasTitle ? normalizeOptionalText(body.title, 120) : null;
   const department = hasDepartment
@@ -241,6 +244,18 @@ export async function PATCH(req: Request) {
 
   if (hasEmail && !email) {
     return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+  }
+
+  if (hasAvatarUrl) {
+    const wantsClearAvatar =
+      avatarUrlInput === null ||
+      (typeof avatarUrlInput === "string" && avatarUrlInput.trim().length === 0);
+    if (!wantsClearAvatar && !avatarUrl) {
+      return NextResponse.json(
+        { error: "Avatar URL must be a valid HTTP(S) image URL" },
+        { status: 400 },
+      );
+    }
   }
 
   if (hasNewPassword && (!newPassword || newPassword.length < 8)) {

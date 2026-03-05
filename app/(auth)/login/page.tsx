@@ -298,37 +298,6 @@ export default function Page() {
     return () => clearTimeout(timer);
   }, [isVerified, countdown, router]);
 
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        if (
-          typeof window !== "undefined" &&
-          window.location.hash.includes("access_token")
-        ) {
-          setLoading(true);
-          try {
-            await finalizeSessionSignIn();
-            toast.success("Logged in successfully");
-            router.push("/");
-          } catch (err: unknown) {
-            const message =
-              err instanceof Error ? err.message : "Failed to sign in";
-            setError(message);
-            toast.error(message);
-            setLoading(false);
-          }
-        }
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
-
   const runPasskeyChallenge = async (userId: string): Promise<string> => {
     if (typeof window === "undefined" || !("PublicKeyCredential" in window)) {
       throw new Error("Passkeys are not supported in this browser");
@@ -503,7 +472,7 @@ export default function Page() {
       const { error: supabaseError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/login`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

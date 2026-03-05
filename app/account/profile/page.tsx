@@ -69,6 +69,7 @@ import {
 } from "next-passkey-webauthn/client";
 import type { StoredCredential } from "next-passkey-webauthn/types";
 import { passkeyEndpoints } from "@/lib/passkey-endpoints";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 type AvatarSaveMode = "original" | "square_crop" | "square_fit";
 
@@ -197,7 +198,7 @@ function normalizeProfileForm(payload: ProfileResponse): ProfileForm {
   return {
     name: payload.user.name ?? "",
     email: payload.user.email ?? "",
-    avatarUrl: payload.user.avatar_url ?? "",
+    avatarUrl: normalizeAvatarUrl(payload.user.avatar_url) ?? "",
     phone: payload.profile.phone ?? "",
     title: payload.profile.title ?? "",
     department: payload.profile.department ?? "",

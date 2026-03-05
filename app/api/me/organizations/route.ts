@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { ACTIVE_ORG_COOKIE } from "@/lib/topbar/constants";
 import { isInviteCreatedAccount } from "@/lib/server/membership-access";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 type CreateOrganizationRequest = {
   type?: "from_scratch" | "from_signup_company";
@@ -109,9 +110,7 @@ export async function POST(req: Request) {
         email: authEmail,
         name: fullName || fallbackName,
         avatar_url:
-          typeof authUser.user_metadata?.avatar_url === "string"
-            ? authUser.user_metadata.avatar_url
-            : null,
+          normalizeAvatarUrl(authUser.user_metadata?.avatar_url),
       },
       { onConflict: "id" },
     );

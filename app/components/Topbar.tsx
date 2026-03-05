@@ -66,6 +66,7 @@ import {
   selectTopbarUnreadCount,
   switchTopbarOrganization,
 } from "@/lib/store/slices/topbar-slice";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 function getInitials(name: string | null, email: string): string {
   if (name) {
@@ -209,6 +210,7 @@ export function Topbar() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
+  const [isAvatarLoadFailed, setIsAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     if (topbarStatus === "idle") {
@@ -244,7 +246,7 @@ export function Topbar() {
 
   const userName = topbarData?.user.name ?? null;
   const userEmail = topbarData?.user.email ?? "";
-  const userAvatarUrl = topbarData?.user.avatar_url ?? null;
+  const userAvatarUrl = normalizeAvatarUrl(topbarData?.user.avatar_url);
   const canCreateOrganizations =
     topbarData?.organizationCreation.canCreateFromScratch ?? true;
   const hasUserIdentity = Boolean(userEmail || userName);
@@ -252,6 +254,10 @@ export function Topbar() {
     ? getInitials(userName, userEmail || "user@local")
     : "";
   const isTopbarLoading = topbarStatus === "loading" && !topbarData;
+
+  useEffect(() => {
+    setIsAvatarLoadFailed(false);
+  }, [userAvatarUrl]);
 
   const handleOrganizationSwitch = async (organizationId: string) => {
     if (isSwitchingOrganization || topbarData?.activeOrgId === organizationId) {
@@ -653,12 +659,13 @@ export function Topbar() {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-lg p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <div className="w-8 h-8 rounded-full bg-foreground/80 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-                  {userAvatarUrl ? (
+                  {userAvatarUrl && !isAvatarLoadFailed ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={userAvatarUrl}
                       alt="User avatar"
                       className="h-full w-full object-cover"
+                      onError={() => setIsAvatarLoadFailed(true)}
                     />
                   ) : hasUserIdentity ? (
                     userInitials

@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from "./lib/supabase-admin";
 import { loadMembershipAccessSummary } from "./lib/server/membership-access";
 import { verifyMfaAssertionToken } from "./lib/server/mfa-assertion";
 import { verifyPasskeyAssertionToken } from "./lib/server/passkey-assertion";
+import { normalizeAvatarUrl } from "./lib/avatar-url";
 
 class InvalidCredentials extends CredentialsSignin {
   code = "Invalid email or password";
@@ -86,8 +87,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: data.user.id,
           email: data.user.email,
           name: fullName || null,
-          image:
-            (data.user.user_metadata?.avatar_url as string | undefined) ?? null,
+          image: normalizeAvatarUrl(data.user.user_metadata?.avatar_url),
         };
       },
     }),
@@ -141,8 +141,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: data.user.id,
           email: data.user.email,
           name: fullName || data.user.user_metadata?.name || null,
-          image:
-            (data.user.user_metadata?.avatar_url as string | undefined) ?? null,
+          image: normalizeAvatarUrl(data.user.user_metadata?.avatar_url),
         };
       },
     }),
@@ -190,8 +189,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: authUser.id,
           email: authUser.email,
           name: fullName || authUser.user_metadata?.name || null,
-          image:
-            (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
+          image: normalizeAvatarUrl(authUser.user_metadata?.avatar_url),
         };
       },
     }),

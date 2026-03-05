@@ -9,6 +9,7 @@ import {
   isInviteCreatedAccount,
   loadMembershipAccessSummary,
 } from "@/lib/server/membership-access";
+import { normalizeAvatarUrl } from "@/lib/avatar-url";
 
 type OrganizationRow = {
   id: string;
@@ -58,7 +59,7 @@ function buildFallbackPayload(
       id: session.user.id,
       name: session.user.name ?? null,
       email: session.user.email ?? "",
-      avatar_url: session.user.image ?? null,
+      avatar_url: normalizeAvatarUrl(session.user.image),
     },
     organizations: [],
     activeOrgId: null,
@@ -134,7 +135,7 @@ export async function GET() {
           id: session.user.id,
           email: session.user.email,
           name: nameFromSession,
-          avatar_url: session.user.image ?? null,
+          avatar_url: normalizeAvatarUrl(session.user.image),
         },
         { onConflict: "id" },
       );
@@ -155,7 +156,7 @@ export async function GET() {
       id: session.user.id,
       email: session.user.email,
       name: session.user.name ?? null,
-      avatar_url: session.user.image ?? null,
+      avatar_url: normalizeAvatarUrl(session.user.image),
     };
 
     const membershipAccessResult = await loadMembershipAccessSummary(
@@ -227,7 +228,10 @@ export async function GET() {
     }
 
     const payload: MeResponse = {
-      user: currentUser,
+      user: {
+        ...currentUser,
+        avatar_url: normalizeAvatarUrl(currentUser.avatar_url),
+      },
       organizations,
       activeOrgId,
       access: membershipAccessResult.error

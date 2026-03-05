@@ -32,6 +32,7 @@ export async function POST(req: Request) {
             first_name: firstName,
             last_name: lastName,
             company: company || "",
+            registered_via_opsdesk: true,
           },
           redirectTo: `${process.env.NEXTAUTH_URL}/login?verified=true`,
         },
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
 
     // Try sending email if registration link was generated successfully
     try {
-      const { data: emailData, error: emailError } = await resend.emails.send({
+      const { error: emailError } = await resend.emails.send({
         from: "OpsDesk <contact@ziadhatem.dev>",
         to: [email],
         subject: "Verify your OpsDesk account",
@@ -65,9 +66,13 @@ export async function POST(req: Request) {
       { message: "User created successfully", user: linkData.user },
       { status: 201 },
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error && err.message
+        ? err.message
+        : "Internal server error";
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: message },
       { status: 500 },
     );
   }

@@ -17,6 +17,7 @@ const PUBLIC_AUTH_ROUTES = new Set([
   "/verify",
   "/forgot-password",
   "/reset-password",
+  "/auth/callback",
   "/auth/magic-link",
   "/payment/thank-you",
 ]);
