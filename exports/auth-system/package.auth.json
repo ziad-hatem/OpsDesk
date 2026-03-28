@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "@radix-ui/react-label": "2.1.2",
+    "@radix-ui/react-slot": "1.1.2",
+    "@react-email/components": "^1.0.8",
+    "@supabase/supabase-js": "^2.98.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "input-otp": "1.4.2",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "0.487.0",
+    "next-auth": "^5.0.0-beta.30",
+    "next-passkey-webauthn": "^0.2.1",
+    "resend": "^6.9.3",
+    "sonner": "2.0.3",
+    "tailwind-merge": "3.2.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10"
+  }
+}

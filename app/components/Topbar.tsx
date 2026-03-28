@@ -32,12 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import {
@@ -185,7 +180,9 @@ function SearchResultCommandItem({
             {shortcutLabel}
           </Badge>
         </div>
-        <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {item.subtitle}
+        </p>
       </div>
       <CommandShortcut>{getRelativeSearchTime(item.createdAt)}</CommandShortcut>
     </CommandItem>
@@ -223,7 +220,10 @@ export function Topbar() {
       void dispatch(fetchTopbarData());
     };
 
-    window.addEventListener("notifications:updated", handleNotificationsUpdated);
+    window.addEventListener(
+      "notifications:updated",
+      handleNotificationsUpdated,
+    );
     return () => {
       window.removeEventListener(
         "notifications:updated",
@@ -240,7 +240,9 @@ export function Topbar() {
     return (
       topbarData.organizations.find(
         (organization) => organization.id === topbarData.activeOrgId,
-      ) ?? topbarData.organizations[0] ?? null
+      ) ??
+      topbarData.organizations[0] ??
+      null
     );
   }, [topbarData]);
 
@@ -269,7 +271,9 @@ export function Topbar() {
       toast.success("Organization switched");
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : "Failed to switch organization";
+        error instanceof Error
+          ? error.message
+          : "Failed to switch organization";
       toast.error(message);
     }
   };
@@ -300,7 +304,9 @@ export function Topbar() {
       );
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : "Failed to create organization";
+        error instanceof Error
+          ? error.message
+          : "Failed to create organization";
       toast.error(message, { id: toastId });
     }
   };
@@ -359,7 +365,8 @@ export function Topbar() {
   }, []);
 
   const normalizedSearchQuery = searchQuery.trim();
-  const canRunSearch = normalizedSearchQuery.length >= GLOBAL_SEARCH_MIN_QUERY_LENGTH;
+  const canRunSearch =
+    normalizedSearchQuery.length >= GLOBAL_SEARCH_MIN_QUERY_LENGTH;
   const showRecents = normalizedSearchQuery.length === 0;
 
   const groupedSearchResults = useMemo(() => {
@@ -448,12 +455,16 @@ export function Topbar() {
       const deduped = [
         nextItem,
         ...prev.filter(
-          (entry) => !(entry.id === nextItem.id && entry.type === nextItem.type),
+          (entry) =>
+            !(entry.id === nextItem.id && entry.type === nextItem.type),
         ),
       ].slice(0, GLOBAL_SEARCH_RECENTS_LIMIT);
 
       try {
-        window.localStorage.setItem(GLOBAL_SEARCH_RECENTS_KEY, JSON.stringify(deduped));
+        window.localStorage.setItem(
+          GLOBAL_SEARCH_RECENTS_KEY,
+          JSON.stringify(deduped),
+        );
       } catch {
         // Ignore storage failures.
       }
@@ -516,7 +527,8 @@ export function Topbar() {
         if (controller.signal.aborted) {
           return;
         }
-        const message = error instanceof Error ? error.message : "Search failed";
+        const message =
+          error instanceof Error ? error.message : "Search failed";
         setSearchError(message);
         setSearchResults([]);
       } finally {
@@ -544,20 +556,20 @@ export function Topbar() {
 
   return (
     <>
-      <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
+      <header className="flex h-16 items-center justify-between border-b border-border bg-background px-4 md:px-6">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="min-w-[220px] justify-between gap-2"
+                className="w-auto md:min-w-[220px] justify-between gap-2 px-2 md:px-4"
                 disabled={isTopbarLoading}
               >
-                <span className="font-medium truncate max-w-[150px]">
+                <span className="font-medium truncate max-w-[80px] sm:max-w-[150px]">
                   {isTopbarLoading
                     ? "Loading workspace..."
-                    : activeOrganization?.name ?? "Select organization"}
+                    : (activeOrganization?.name ?? "Select organization")}
                 </span>
                 {isSwitchingOrganization ? (
                   <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
@@ -597,7 +609,11 @@ export function Topbar() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleCreateOrganizationClick}
-                disabled={isCreatingOrganization || isTopbarLoading || !canCreateOrganizations}
+                disabled={
+                  isCreatingOrganization ||
+                  isTopbarLoading ||
+                  !canCreateOrganizations
+                }
               >
                 {isCreatingOrganization ? (
                   <div className="flex items-center gap-2">
@@ -613,7 +629,8 @@ export function Topbar() {
                   Organization creation is disabled for invited accounts.
                 </DropdownMenuItem>
               )}
-              {topbarData?.organizationCreation.canCreateFromSignupOrganization &&
+              {topbarData?.organizationCreation
+                .canCreateFromSignupOrganization &&
                 topbarData.organizationCreation.signupOrganizationName && (
                   <DropdownMenuItem disabled>
                     First organization will use:{" "}
@@ -624,19 +641,19 @@ export function Topbar() {
           </DropdownMenu>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <ThemeToggle />
 
           <Button
             variant="outline"
-            className="min-w-[300px] justify-between gap-2 text-muted-foreground"
+            className="w-9 px-0 md:w-auto md:px-4 md:min-w-[300px] justify-center md:justify-between gap-2 text-muted-foreground"
             onClick={() => setSearchOpen(true)}
           >
             <div className="flex items-center gap-2">
               <Search className="w-4 h-4" />
-              <span>Search...</span>
+              <span className="hidden md:inline">Search...</span>
             </div>
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs text-muted-foreground">
+            <kbd className="hidden md:inline-flex pointer-events-none h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs text-muted-foreground">
               Ctrl+K
             </kbd>
           </Button>
@@ -721,16 +738,28 @@ export function Topbar() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-2">
-              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
+              <Badge
+                variant="secondary"
+                className="rounded-full bg-muted/70 text-foreground"
+              >
                 Tickets
               </Badge>
-              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
+              <Badge
+                variant="secondary"
+                className="rounded-full bg-muted/70 text-foreground"
+              >
                 Customers
               </Badge>
-              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
+              <Badge
+                variant="secondary"
+                className="rounded-full bg-muted/70 text-foreground"
+              >
                 Orders
               </Badge>
-              <Badge variant="secondary" className="rounded-full bg-muted/70 text-foreground">
+              <Badge
+                variant="secondary"
+                className="rounded-full bg-muted/70 text-foreground"
+              >
                 Team Members
               </Badge>
             </div>
@@ -743,14 +772,17 @@ export function Topbar() {
               className="text-sm"
             />
             <CommandList className="max-h-[430px] bg-background">
-              {canRunSearch && !isSearchLoading && !searchError && totalSearchResults > 0 && (
-                <div className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                  Showing {totalSearchResults} results for
-                  <span className="px-1 font-medium text-foreground">
-                    {`"${normalizedSearchQuery}"`}
-                  </span>
-                </div>
-              )}
+              {canRunSearch &&
+                !isSearchLoading &&
+                !searchError &&
+                totalSearchResults > 0 && (
+                  <div className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                    Showing {totalSearchResults} results for
+                    <span className="px-1 font-medium text-foreground">
+                      {`"${normalizedSearchQuery}"`}
+                    </span>
+                  </div>
+                )}
 
               {showRecents && (
                 <>
@@ -768,8 +800,12 @@ export function Topbar() {
                             <Icon className="h-4 w-4 text-muted-foreground" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-foreground">{action.label}</p>
-                            <p className="truncate text-xs text-muted-foreground">{action.subtitle}</p>
+                            <p className="truncate font-medium text-foreground">
+                              {action.label}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {action.subtitle}
+                            </p>
                           </div>
                           <CommandShortcut>{action.shortcut}</CommandShortcut>
                         </CommandItem>
@@ -794,12 +830,17 @@ export function Topbar() {
                           <Clock3 className="h-4 w-4 text-muted-foreground" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-foreground">{item.title}</p>
+                          <p className="truncate font-medium text-foreground">
+                            {item.title}
+                          </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {item.subtitle} · {getRelativeSearchTime(item.selectedAt)}
+                            {item.subtitle} ·{" "}
+                            {getRelativeSearchTime(item.selectedAt)}
                           </p>
                         </div>
-                        <CommandShortcut>{getSearchTypeLabel(item.type)}</CommandShortcut>
+                        <CommandShortcut>
+                          {getSearchTypeLabel(item.type)}
+                        </CommandShortcut>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -809,7 +850,8 @@ export function Topbar() {
 
               {!canRunSearch && normalizedSearchQuery.length > 0 && (
                 <div className="px-3 py-7 text-center text-sm text-muted-foreground">
-                  Type at least {GLOBAL_SEARCH_MIN_QUERY_LENGTH} characters to search.
+                  Type at least {GLOBAL_SEARCH_MIN_QUERY_LENGTH} characters to
+                  search.
                 </div>
               )}
 
@@ -817,10 +859,10 @@ export function Topbar() {
                 normalizedSearchQuery.length === 0 &&
                 recentSearches.length === 0 &&
                 quickActions.length === 0 && (
-                <div className="px-3 py-10 text-center text-sm text-muted-foreground">
-                  Search anything in your workspace from one command palette.
-                </div>
-              )}
+                  <div className="px-3 py-10 text-center text-sm text-muted-foreground">
+                    Search anything in your workspace from one command palette.
+                  </div>
+                )}
 
               {canRunSearch && isSearchLoading && (
                 <div className="space-y-2 px-3 py-4">
@@ -834,7 +876,9 @@ export function Topbar() {
               )}
 
               {canRunSearch && !isSearchLoading && searchError && (
-                <div className="px-3 py-8 text-center text-sm text-red-600">{searchError}</div>
+                <div className="px-3 py-8 text-center text-sm text-red-600">
+                  {searchError}
+                </div>
               )}
 
               {canRunSearch &&
@@ -913,7 +957,9 @@ export function Topbar() {
               {canRunSearch &&
                 !isSearchLoading &&
                 !searchError &&
-                searchResults.length === 0 && <CommandEmpty>No matching records found.</CommandEmpty>}
+                searchResults.length === 0 && (
+                  <CommandEmpty>No matching records found.</CommandEmpty>
+                )}
             </CommandList>
           </Command>
           <div className="flex items-center justify-between border-t border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
@@ -934,13 +980,18 @@ export function Topbar() {
               </span>
             </div>
             <span>
-              {canRunSearch ? `${totalSearchResults} result(s)` : "Start typing to search"}
+              {canRunSearch
+                ? `${totalSearchResults} result(s)`
+                : "Start typing to search"}
             </span>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={createOrganizationOpen} onOpenChange={setCreateOrganizationOpen}>
+      <Dialog
+        open={createOrganizationOpen}
+        onOpenChange={setCreateOrganizationOpen}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Create organization</DialogTitle>
@@ -949,7 +1000,9 @@ export function Topbar() {
             <Input
               placeholder="Organization name"
               value={scratchOrganizationName}
-              onChange={(event) => setScratchOrganizationName(event.target.value)}
+              onChange={(event) =>
+                setScratchOrganizationName(event.target.value)
+              }
               disabled={isCreatingOrganization}
             />
             <div className="flex justify-end gap-2">
@@ -962,7 +1015,9 @@ export function Topbar() {
               </Button>
               <Button
                 onClick={handleCreateFromScratch}
-                disabled={!scratchOrganizationName.trim() || isCreatingOrganization}
+                disabled={
+                  !scratchOrganizationName.trim() || isCreatingOrganization
+                }
               >
                 {isCreatingOrganization ? (
                   <span className="flex items-center gap-2">
@@ -980,4 +1035,3 @@ export function Topbar() {
     </>
   );
 }
-

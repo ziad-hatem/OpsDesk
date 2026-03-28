@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
   fetchTopbarData,
@@ -18,34 +17,42 @@ export function NotificationRealtimeBridge() {
       return;
     }
 
-    const channel = supabase
-      .channel(`notifications-websocket-${currentUser.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${currentUser.id}`,
-        },
-        () => {
-          if (refreshTimeoutRef.current) {
-            clearTimeout(refreshTimeoutRef.current);
-          }
-          refreshTimeoutRef.current = setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("notifications:updated"));
-            void dispatch(fetchTopbarData());
-          }, 150);
-        },
-      )
-      .subscribe();
+    const handleNotificationsUpdated = () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      refreshTimeoutRef.current = setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("notifications:updated"));
+        void dispatch(fetchTopbarData());
+      }, 150);
+    };
+
+    const eventSource = new EventSource("/api/notifications/stream", {
+      withCredentials: true,
+    });
+    eventSource.addEventListener(
+      "notifications.snapshot",
+      handleNotificationsUpdated,
+    );
+    eventSource.addEventListener(
+      "notifications.updated",
+      handleNotificationsUpdated,
+    );
 
     return () => {
+      eventSource.removeEventListener(
+        "notifications.snapshot",
+        handleNotificationsUpdated,
+      );
+      eventSource.removeEventListener(
+        "notifications.updated",
+        handleNotificationsUpdated,
+      );
+      eventSource.close();
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
         refreshTimeoutRef.current = null;
       }
-      void supabase.removeChannel(channel);
     };
   }, [currentUser?.id, dispatch]);
 

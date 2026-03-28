@@ -18,7 +18,7 @@ The frontend includes three user-facing surfaces:
 - UI primitives: Radix UI wrappers under `app/components/ui/*`.
 - State: Redux Toolkit (`auth`, `topbar`, `tickets` slices) + React local state.
 - Auth/session: NextAuth v5 beta + Supabase auth.
-- Realtime: Supabase channels (notifications and membership access changes).
+- Realtime: SSE stream for notifications + Supabase channels for membership access changes.
 - Tables/charts: TanStack React Table + Recharts.
 - UX feedback: Sonner toasts.
 - Passkeys: `next-passkey-webauthn` integration.
@@ -72,10 +72,10 @@ The frontend includes three user-facing surfaces:
 ### Realtime behavior
 
 - `NotificationRealtimeBridge`
-  - Subscribes to Supabase `notifications` table changes for current user.
+  - Opens `EventSource` connection to `/api/notifications/stream`.
   - Dispatches `fetchTopbarData()` and emits `notifications:updated`.
 - `MembershipRealtimeGuard`
-  - Polls + subscribes to `organization_memberships` changes.
+  - Polls + subscribes to `organization_memberships` changes via Supabase realtime.
   - If access becomes suspended-only, user is signed out and redirected.
 
 ### UI system
