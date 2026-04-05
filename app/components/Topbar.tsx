@@ -21,6 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "facehash";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
@@ -207,7 +208,6 @@ export function Topbar() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
-  const [isAvatarLoadFailed, setIsAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     if (topbarStatus === "idle") {
@@ -256,10 +256,6 @@ export function Topbar() {
     ? getInitials(userName, userEmail || "user@local")
     : "";
   const isTopbarLoading = topbarStatus === "loading" && !topbarData;
-
-  useEffect(() => {
-    setIsAvatarLoadFailed(false);
-  }, [userAvatarUrl]);
 
   const handleOrganizationSwitch = async (organizationId: string) => {
     if (isSwitchingOrganization || topbarData?.activeOrgId === organizationId) {
@@ -675,28 +671,10 @@ export function Topbar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-lg p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <div className="w-8 h-8 rounded-full bg-foreground/80 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-                  {userAvatarUrl && !isAvatarLoadFailed ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={userAvatarUrl}
-                      alt="User avatar"
-                      className="h-full w-full object-cover"
-                      onError={() => setIsAvatarLoadFailed(true)}
-                    />
-                  ) : hasUserIdentity ? (
-                    userInitials
-                  ) : (
-                    <Image
-                      src="/logo.webp"
-                      alt="OpsDesk logo"
-                      width={32}
-                      height={32}
-                      className="h-full w-full object-cover"
-                      sizes="32px"
-                    />
-                  )}
-                </div>
+                <Avatar className="w-8 h-8 rounded-full overflow-hidden border border-border">
+                  <AvatarImage src={userAvatarUrl ?? undefined} alt={userName || "User Avatar"} />
+                  <AvatarFallback name={userName || userEmail || "Anonymous"} />
+                </Avatar>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[240px]">

@@ -32,11 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/app/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "facehash";
 import { Badge } from "@/app/components/ui/badge";
 import {
   AlertDialog,
@@ -898,11 +894,9 @@ export default function AccountProfilePage() {
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center text-center gap-3">
               <div className="relative">
-                <Avatar className="h-28 w-28 border border-border">
+                <Avatar className="h-28 w-28 overflow-hidden rounded-full border border-border">
                   <AvatarImage src={profileForm.avatarUrl || undefined} alt="Profile avatar" />
-                  <AvatarFallback className="text-lg font-medium text-foreground">
-                    {initials}
-                  </AvatarFallback>
+                  <AvatarFallback name={profileForm.name || profileForm.email || "Anonymous"} />
                 </Avatar>
                 <button
                   type="button"
