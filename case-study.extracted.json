@@ -1,0 +1,112 @@
+{
+  "slug": "opsdesk",
+  "indexCode": null,
+  "name": "OpsDesk",
+  "status": "in-development",
+  "shippedDate": "2026-07",
+  "domain": null,
+  "liveUrl": "#",
+  "lighthouseScore": 76,
+  "heroDeemphasis": "— a self-hosted, multi-tenant support-ops console: tickets, orders, incidents, SLA, and RBAC in one Next.js 16 app over Supabase.",
+  "liveCtaLabel": "View source on GitHub",
+  "overview": "OpsDesk is a single Next.js 16 / React 19 application that gives a support team one place to manage tickets, orders, customers, and incidents — with an SLA/escalation engine, a trigger-based automation engine, org-scoped RBAC, executive reporting, and a separate customer-facing portal — all on top of a single Supabase project instead of a bundled third-party helpdesk SaaS.",
+  "contextParagraphs": [
+    "Based on the feature set actually implemented, OpsDesk reads as a self-hosted alternative to a bundled helpdesk/support-ops SaaS for a team that wants that stack on its own Supabase project rather than a third-party subscription. That is an inference from the code, not a stated product brief — there is no product spec or marketing page in the repository to confirm it.",
+    "Two things about the architecture are easy to miss on a first pass: Postgres Row Level Security is enabled on only 3 of roughly 44 application tables (the three purely user-scoped auth tables — passkeys, passkey challenges, email-MFA challenges); every ticket/order/customer/incident/RBAC/audit table instead relies entirely on application code remembering to filter by organization_id. And three separate identity mechanisms coexist by design: a NextAuth JWT session for staff (bridged from Supabase Auth), the underlying Supabase Auth session itself, and a fully independent, hand-rolled magic-link session system for the customer portal."
+  ],
+  "nextSlug": null,
+  "nextLabel": null,
+
+  "sourceUrl": "https://github.com/ziad-hatem/OpsDesk",
+  "roleRows": [
+    { "tag": "R-01", "text": "Built the application end-to-end as the sole contributor — one git author across all 25 commits, same identity under two name/email-casing variants — domain model, UI, and every Route Handler API under app/api/**." },
+    { "tag": "R-02", "text": "Designed the multi-tenant data model (organization-scoped tickets, orders, customers, incidents, and roughly 44 tables total) and its application-layer tenant-isolation pattern." },
+    { "tag": "R-03", "text": "Built the SLA/escalation engine and the trigger → condition → action automation engine, spanning tickets, orders, customers, incidents, and portal events." },
+    { "tag": "R-04", "text": "Implemented the full auth stack: NextAuth v5 bridged to Supabase Auth, Google OAuth, passwordless magic links, WebAuthn passkeys, and an email-code MFA step-up." },
+    { "tag": "R-05", "text": "Built org-scoped RBAC (four system roles plus custom roles with permission overrides, optional approval-request workflow), the executive-reporting/analytics views, and a separate passwordless customer portal." }
+  ],
+  "architectureDecisions": [
+    {
+      "index": "A-01",
+      "title": "NextAuth v5 (beta) layered on top of Supabase Auth, instead of either system alone",
+      "body": "The trade-off was giving up a single source of truth for \"is this user logged in\" — a NextAuth JWT session and an independent Supabase Auth session now both exist per user, and the code has to remember which one to tear down on failure — worth it because it gets Supabase's maintained password/OAuth/magic-link/admin-user machinery for free while every route still gets NextAuth's App-Router-native auth()/useSession() ergonomics, with the org-membership-suspension check centralized in exactly one place (assertHasActiveMembership) across all three credential providers instead of duplicated per sign-in method."
+    },
+    {
+      "index": "A-02",
+      "title": "Shared-schema multi-tenancy with application-layer organization_id filtering, not Postgres RLS",
+      "body": "The trade-off was that tenant isolation became a property of code discipline rather than the database — a single missing .eq(\"organization_id\", ...) filter in any future query is a cross-tenant data leak with no second line of defense, and RLS is enabled on only 3 of the ~44 tables (the auth-only ones, keyed by user_id, not organization_id) — worth it as the cheapest model to build against: ordinary SQL joins across tickets/orders/customers work without per-tenant connection routing, and it's consistent with how the app already resolves the active organization everywhere else (a cookie plus a live membership lookup)."
+    },
+    {
+      "index": "A-03",
+      "title": "Redux Toolkit for exactly three global slices (auth, tickets, topbar), local state everywhere else",
+      "body": "The trade-off was inconsistency — a reader can't assume \"global state = source of truth\" project-wide since orders, customers, incidents, automation, and reports pages all fetch with local component state instead — worth it because the three slices that did get the global-store treatment need explicit, hand-choreographed cross-slice behavior (wiping the ticket cache specifically on an org switch, optimistic patches to cached ticket details without a refetch) that a query-key-based cache library would need bespoke glue to express."
+    },
+    {
+      "index": "A-04",
+      "title": "SSE-shaped server polling for the notification stream, instead of the WebSocket the app already uses elsewhere",
+      "body": "The trade-off was efficiency — the server re-queries Supabase on a fixed 5-second cadence per open browser tab whether or not anything changed, which is strictly less efficient than the real Supabase Realtime WebSocket subscription the same codebase already uses for membership-suspension detection — worth it (as the codebase evidences it) because a long-lived EventSource with hash-diffing and built-in auto-reconnect was simpler to stand up for this feature than wiring a second client-side Realtime subscription, at the cost of now having three different \"live update\" approaches in the app with no shared rationale between them."
+    },
+    {
+      "index": "A-05",
+      "title": "Client-side, layout-level route protection instead of middleware.ts",
+      "body": "The trade-off was that page protection only ever runs after the page's JS has already been requested and started rendering, so the real security boundary has to be each API route's own auth() check rather than a single edge-level chokepoint — worth it because the entire page-level gate is readable in one client file (a route Set plus a handful of prefix checks) driven by the same useSession() hook the rest of the UI already depends on, instead of maintaining a second, edge-runtime-safe way of reading the session."
+    }
+  ],
+  "measuredQuality": {
+    "a11ySummary": "Lint-enforced only, no dedicated tooling",
+    "a11yDetail": "No axe-core/pa11y test suite and no project-authored eslint-plugin-jsx-a11y config exist — both appear in package-lock.json only as transitive dependencies of eslint-config-next. eslint.config.mjs extends eslint-config-next's core-web-vitals preset, which resolves to enabling six jsx-a11y rules (alt-text, aria-props, aria-proptypes, aria-unsupported-elements, role-has-required-aria-props, role-supports-aria-props) — confirmed by grepping the installed eslint-config-next/dist/index.js. A repo-wide search found explicit aria- attributes used in 8 files under app/.",
+    "checkedDate": "2026-07-06"
+  },
+  "resultsParagraph": "OpsDesk has no production deployment, so there is no real usage, uptime, or field-performance data to report. What's actually verifiable from the repository: a solo build covering roughly 44 database tables across nine feature areas (tickets, orders, customers, incidents, SLA, automation, RBAC, reporting, and a separate customer portal); a documented, present-tense-honest test state (39/39 unit tests passing, but 7 of 22 Vitest component tests currently failing because they assert on login/register UI text that no longer exists after Google OAuth was wired up — caught and recorded in docs/TESTING.md rather than left silent); and a measured Lighthouse performance score of 76 against the /login page on a local, unoptimized next dev server (a production next build/next start audit was not performed and would likely score differently).",
+
+  "heroTail": "built and documented solo, including the gaps.",
+  "stackList": [
+    "Next.js 16 (App Router)",
+    "React 19",
+    "TypeScript",
+    "NextAuth v5 (beta)",
+    "next-passkey-webauthn",
+    "Supabase (Postgres, Auth, Storage)",
+    "Redux Toolkit",
+    "Radix UI",
+    "MUI (partial surface)",
+    "Tailwind CSS v4",
+    "TanStack Table",
+    "Recharts",
+    "React Hook Form",
+    "Resend + React Email",
+    "Stripe",
+    "Vercel Blob",
+    "Vitest + Testing Library",
+    "Playwright"
+  ],
+  "testing": {
+    "unitTestCount": 61,
+    "e2eTestCount": 12,
+    "ciSummary": "No CI/CD pipeline exists — no .github/workflows, no vercel.json, no Dockerfile — so every test script runs locally, on demand, with nothing blocking a merge or push on failure. As of the last documented run (commit 98cd095, recorded in docs/TESTING.md), 39/39 unit tests passed but 7 of 22 component tests were failing, and at least two e2e assertions reference UI text confirmed to no longer exist in the source; the failures are attributed to test staleness (written before Google OAuth replaced a disabled placeholder button), not a regression in the pages themselves."
+  },
+  "retrospective": "The most honest thing to say about OpsDesk's current state is that its own documentation caught a real problem while being written: actually running the test suite for docs/TESTING.md surfaced that 7 of 22 component tests fail because they assert on UI text (\"Google sign-in (coming soon)\") that no longer exists once Google OAuth was wired up for real — the tests were never updated when the pages changed, so a green npm test badge would have been actively misleading if I hadn't run it and looked. That, combined with Row Level Security covering only 3 of roughly 44 tables (everything else depends on every query remembering an organization_id filter) and there still being no CI to catch either problem automatically, are the two things I'd want fixed before calling this production-ready: get a CI pipeline actually running on push, and either extend RLS as a real second line of defense or write down app-layer-only isolation as a deliberate, accepted trade-off instead of an implicit one. (Draft — for the portfolio owner to revise into a first-person reflection.)",
+
+  "_needsInput": [
+    { "field": "indexCode", "reason": "depends on ziadhatem.dev's existing case-study sequence" },
+    { "field": "nextSlug/nextLabel", "reason": "depends on which other case study should follow this one" },
+    { "field": "domain/liveUrl/liveCtaLabel", "reason": "no live deployment exists anywhere in the repo (no vercel.json, no confirmed hosting) — decide whether the hero CTA should point at the GitHub source instead, or be hidden entirely" },
+    { "field": "sourceUrl visibility", "reason": "could not confirm via `gh` (not installed in this session) whether github.com/ziad-hatem/OpsDesk is public or private — confirm before publishing a link to it" },
+    { "field": "shippedDate semantics", "reason": "used the most recent commit's month (2026-07); the repo has no live launch date since status is in-development — confirm whether shippedDate should instead mean first-commit month (2026-03) or something else entirely for a not-yet-shipped project" },
+    { "field": "lighthouseScore caveat", "reason": "measured against `npm run dev` (Turbopack, unminified) on localhost:3002/login, not a production `next build`/`next start` — a production audit would likely score differently (probably higher) and should be re-run if a representative number is wanted" },
+    { "field": "publishing docs/SECURITY.md-derived findings", "reason": "several architectureDecisions/testing/retrospective entries here cite real, currently-unresolved weaknesses (RLS gaps, JWT fallback-secret reuse, missing rate limiting) documented in the repo's own docs/SECURITY.md — confirm these are acceptable to make public in a portfolio before this ships" }
+  ],
+  "_evidence": {
+    "shippedDate": "git log oldest→newest commit dates: first commit 2026-03-02 (\"Initial commit from Create Next App\"), most recent 2026-07-06 (\"chore: add comprehensive documentation suite and update README\"); shippedDate uses the latter",
+    "contributors": "git shortlog -sn --all: 21 commits as \"Ziad Hatem\", 4 as \"ziad-hatem\" — both <ziadhatem2022@gmail.com>, i.e. a single contributor across all 25 commits",
+    "technologies/stackList": "package.json dependencies/devDependencies + next.config.ts, eslint.config.mjs, playwright.config.ts, vitest.config.ts, tailwind (postcss.config.mjs)",
+    "testing.unitTestCount": "grep -rE \"^\\s*(test|it)\\(\" across tests/unit (39 matches, 11 files) + tests/components (22 matches, 5 files) = 61; also cross-checked against docs/TESTING.md's own file-by-file counts (11 files/39 tests, 5 files/22 tests)",
+    "testing.e2eTestCount": "grep -rE \"^\\s*test\\(\" tests/e2e --include=*.ts → 12 matches across 2 spec files (login.spec.ts, register-verify.spec.ts)",
+    "testing.ciSummary": "docs/TESTING.md \"Current suite health\" and \"No CI\" sections; confirmed no .github/, vercel.json, or Dockerfile exist in the repo root via `find`/`ls`",
+    "no CI/license/deploy config": "`ls`/`find` in repo root: no .github/ directory, no vercel.json, no netlify.toml, no CNAME, no LICENSE*, no .env.example; package.json has no \"homepage\" field",
+    "architectureDecisions": "docs/DECISIONS.md ADR-001, ADR-002, ADR-003, ADR-004, ADR-007 (condensed into trade-off form; document states these are reconstructed post-hoc from code, not original team ADRs, and all are marked Status: Inferred)",
+    "measuredQuality.a11yDetail": "package-lock.json entries for eslint-plugin-jsx-a11y and axe-core (both transitive, not in package.json); grep -o \"jsx-a11y/[a-z-]*\" node_modules/eslint-config-next/dist/index.js listed 6 enabled rules; grep -rl \"aria-[a-z]+=\" app --include=*.tsx found 8 files",
+    "lighthouseScore": "npx lighthouse http://localhost:3002/login --only-categories=performance run against `npm run dev` after clearing a stale .next cache that was causing a Turbopack crash on the first attempt (port 3000/3001); performance score 0.76 (76), FCP 0.9s, LCP 7.4s, TBT 50ms, CLS 0, Speed Index 0.9s; dev server stopped after the audit",
+    "roleRows/status": "README.md \"Known Limitations\" and \"Missing Information\" sections explicitly state no CI/CD, no LICENSE, and no live/demo URL exist"
+  }
+}

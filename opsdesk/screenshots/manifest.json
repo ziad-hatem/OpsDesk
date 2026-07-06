@@ -1,0 +1,16 @@
+[
+  {
+    "file": "screenshots/hero-desktop.png",
+    "alt": "OpsDesk login page in desktop light mode: an email/password sign-in form, a 'Send Magic Link' passwordless option, and a 'Sign in with Google' button below an 'OR CONTINUE WITH' divider",
+    "width": 1440,
+    "height": 900,
+    "for": "hero"
+  },
+  {
+    "file": "screenshots/hero-mobile.png",
+    "alt": "The same OpsDesk login page reflowed to a single-column mobile layout at 390px width, all sign-in options stacked vertically",
+    "width": 390,
+    "height": 844,
+    "for": "hero"
+  }
+]
