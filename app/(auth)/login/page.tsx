@@ -202,6 +202,8 @@ export default function Page() {
   });
   const normalizedEmail = normalizeEmail(email);
   const hasValidEmail = isEmailFormat(normalizedEmail);
+  const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL;
+  const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
 
   const disableLoginActions =
     loading ||
@@ -781,6 +783,23 @@ export default function Page() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
+                ) : null}
+
+                {demoEmail && demoPassword ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail(demoEmail);
+                      setPassword(demoPassword);
+                    }}
+                    disabled={disableLoginActions}
+                    className="w-full rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted"
+                  >
+                    <span className="font-medium text-foreground">
+                      Try the live demo
+                    </span>{" "}
+                    &mdash; fills in {demoEmail}. Demo data resets every hour.
+                  </button>
                 ) : null}
 
                 <div className="space-y-2">

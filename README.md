@@ -193,7 +193,7 @@ The full, per-feature environment variable reference (required vs. optional, wha
 | `NEXTAUTH_URL` | Canonical app base URL, used to build auth/email/payment redirect links |
 | `RESEND_API_KEY` | Required for any transactional email (registration, magic link, MFA code, invites, payment links, reports) to send |
 
-Payments (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`), scheduled report delivery (`REPORTS_SCHEDULER_SECRET`), the inbound communications webhook (`COMMUNICATIONS_WEBHOOK_SECRET`), and passkeys (`PASSKEY_*`) are feature-scoped and only required if you use those features — see the linked docs.
+Payments (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`), scheduled report delivery (`REPORTS_SCHEDULER_SECRET`), the inbound communications webhook (`COMMUNICATIONS_WEBHOOK_SECRET`), passkeys (`PASSKEY_*`), and the demo account (`NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD`, `CRON_SECRET`) are feature-scoped and only required if you use those features — see the linked docs.
 
 ## Scripts
 

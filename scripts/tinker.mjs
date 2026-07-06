@@ -2,7 +2,14 @@
 
 import crypto from "node:crypto";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+
+try {
+  process.loadEnvFile(fileURLToPath(new URL("../.env.local", import.meta.url)));
+} catch {
+  // ponytail: no .env.local next to the repo (e.g. CI) — assume env vars are already set.
+}
 
 const SCENARIOS = {
   team: "Team members + invite flow data",
@@ -151,7 +158,10 @@ function slugify(value) {
 }
 
 function compactRunTag() {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
   const short = crypto.randomBytes(2).toString("hex");
   return `${stamp}-${short}`;
 }
@@ -187,7 +197,9 @@ function isMissingTableError(error) {
 
 function isMissingColumnError(error, column) {
   const message = `${error?.message ?? ""}`.toLowerCase();
-  return message.includes(`column ${column}`) && message.includes("does not exist");
+  return (
+    message.includes(`column ${column}`) && message.includes("does not exist")
+  );
 }
 
 function isDuplicateError(error) {
@@ -262,7 +274,9 @@ function createTableChecker(supabase, log) {
 async function requireTables(ctx, tableNames) {
   for (const table of tableNames) {
     if (!(await ctx.tableExists(table))) {
-      ctx.log.warn(`Scenario "${ctx.currentScenario}" skipped (missing table: ${table}).`);
+      ctx.log.warn(
+        `Scenario "${ctx.currentScenario}" skipped (missing table: ${table}).`,
+      );
       return false;
     }
   }
@@ -271,15 +285,24 @@ async function requireTables(ctx, tableNames) {
 
 async function insertRow(ctx, table, payload) {
   if (!(await ctx.tableExists(table))) return null;
-  const { data, error } = await ctx.supabase.from(table).insert(payload).select("*").single();
-  if (error) throw new Error(`Failed to insert into ${table}: ${error.message}`);
+  const { data, error } = await ctx.supabase
+    .from(table)
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error)
+    throw new Error(`Failed to insert into ${table}: ${error.message}`);
   return data;
 }
 
 async function insertRows(ctx, table, payloads) {
   if (!(await ctx.tableExists(table))) return [];
-  const { data, error } = await ctx.supabase.from(table).insert(payloads).select("*");
-  if (error) throw new Error(`Failed to insert rows into ${table}: ${error.message}`);
+  const { data, error } = await ctx.supabase
+    .from(table)
+    .insert(payloads)
+    .select("*");
+  if (error)
+    throw new Error(`Failed to insert rows into ${table}: ${error.message}`);
   return data ?? [];
 }
 
@@ -303,7 +326,9 @@ async function ensureUserByEmail(ctx, email, allowCreate) {
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Failed to query user "${normalizedEmail}": ${error.message}`);
+    throw new Error(
+      `Failed to query user "${normalizedEmail}": ${error.message}`,
+    );
   }
 
   if (data) return data;
@@ -331,7 +356,9 @@ async function selectMembershipRows(ctx, userId) {
     .eq("user_id", userId);
 
   if (!withStatus.error) return withStatus.data ?? [];
-  if (!isMissingColumnError(withStatus.error, "organization_memberships.status")) {
+  if (
+    !isMissingColumnError(withStatus.error, "organization_memberships.status")
+  ) {
     throw new Error(`Failed to load memberships: ${withStatus.error.message}`);
   }
 
@@ -376,11 +403,22 @@ async function ensureMembership(ctx, organizationId, userId, role) {
 
   if (!withStatusResult.error) return withStatusResult.data;
   if (
-    !isMissingColumnError(withStatusResult.error, "organization_memberships.status") &&
-    !isMissingColumnError(withStatusResult.error, "organization_memberships.joined_at") &&
-    !isMissingColumnError(withStatusResult.error, "organization_memberships.updated_at")
+    !isMissingColumnError(
+      withStatusResult.error,
+      "organization_memberships.status",
+    ) &&
+    !isMissingColumnError(
+      withStatusResult.error,
+      "organization_memberships.joined_at",
+    ) &&
+    !isMissingColumnError(
+      withStatusResult.error,
+      "organization_memberships.updated_at",
+    )
   ) {
-    throw new Error(`Failed to insert membership: ${withStatusResult.error.message}`);
+    throw new Error(
+      `Failed to insert membership: ${withStatusResult.error.message}`,
+    );
   }
 
   const fallbackResult = await ctx.supabase
@@ -394,7 +432,9 @@ async function ensureMembership(ctx, organizationId, userId, role) {
     .single();
 
   if (fallbackResult.error) {
-    throw new Error(`Failed to insert membership fallback: ${fallbackResult.error.message}`);
+    throw new Error(
+      `Failed to insert membership fallback: ${fallbackResult.error.message}`,
+    );
   }
   return fallbackResult.data;
 }
@@ -418,7 +458,9 @@ async function createOrganization(ctx, email) {
     }
   }
 
-  throw new Error("Unable to create organization slug after multiple attempts.");
+  throw new Error(
+    "Unable to create organization slug after multiple attempts.",
+  );
 }
 
 async function resolveOrganization(ctx, actorUser, options) {
@@ -428,7 +470,8 @@ async function resolveOrganization(ctx, actorUser, options) {
       .select("id,name,slug")
       .eq("id", options.orgId)
       .maybeSingle();
-    if (error) throw new Error(`Failed to load organization by id: ${error.message}`);
+    if (error)
+      throw new Error(`Failed to load organization by id: ${error.message}`);
     if (!data) throw new Error(`Organization id not found: ${options.orgId}`);
     await ensureMembership(ctx, data.id, actorUser.id, "admin");
     return data;
@@ -440,8 +483,10 @@ async function resolveOrganization(ctx, actorUser, options) {
       .select("id,name,slug")
       .eq("slug", options.orgSlug)
       .maybeSingle();
-    if (error) throw new Error(`Failed to load organization by slug: ${error.message}`);
-    if (!data) throw new Error(`Organization slug not found: ${options.orgSlug}`);
+    if (error)
+      throw new Error(`Failed to load organization by slug: ${error.message}`);
+    if (!data)
+      throw new Error(`Organization slug not found: ${options.orgSlug}`);
     await ensureMembership(ctx, data.id, actorUser.id, "admin");
     return data;
   }
@@ -454,7 +499,10 @@ async function resolveOrganization(ctx, actorUser, options) {
       .select("id,name,slug")
       .eq("id", preferred.organization_id)
       .maybeSingle();
-    if (error) throw new Error(`Failed to resolve membership organization: ${error.message}`);
+    if (error)
+      throw new Error(
+        `Failed to resolve membership organization: ${error.message}`,
+      );
     if (data) return data;
   }
 
@@ -469,16 +517,34 @@ async function ensureDemoTeam(ctx) {
 
   const suffix = ctx.organization.id.replace(/-/g, "").slice(0, 8);
   const template = [
-    { key: "manager", role: "manager", email: `manager+${suffix}@opsdesk.demo`, name: "Manager Demo" },
-    { key: "support", role: "support", email: `support+${suffix}@opsdesk.demo`, name: "Support Demo" },
-    { key: "readOnly", role: "read_only", email: `readonly+${suffix}@opsdesk.demo`, name: "Read Only Demo" },
+    {
+      key: "manager",
+      role: "manager",
+      email: `manager+${suffix}@opsdesk.demo`,
+      name: "Manager Demo",
+    },
+    {
+      key: "support",
+      role: "support",
+      email: `support+${suffix}@opsdesk.demo`,
+      name: "Support Demo",
+    },
+    {
+      key: "readOnly",
+      role: "read_only",
+      email: `readonly+${suffix}@opsdesk.demo`,
+      name: "Read Only Demo",
+    },
   ];
 
   ctx.runtime.users.actor = ctx.actorUser;
   for (const item of template) {
     const user = await ensureUserByEmail(ctx, item.email, true);
     if (!user.name) {
-      await ctx.supabase.from("users").update({ name: item.name }).eq("id", user.id);
+      await ctx.supabase
+        .from("users")
+        .update({ name: item.name })
+        .eq("id", user.id);
       user.name = item.name;
     }
     await ensureMembership(ctx, ctx.organization.id, user.id, item.role);
@@ -503,7 +569,11 @@ async function writeAuditLog(ctx, payload) {
     created_at: nowIso(),
   };
 
-  const first = await ctx.supabase.from("audit_logs").insert(fullPayload).select("*").maybeSingle();
+  const first = await ctx.supabase
+    .from("audit_logs")
+    .insert(fullPayload)
+    .select("*")
+    .maybeSingle();
   if (!first.error) return first.data;
 
   const fallbackPayload = {
@@ -559,7 +629,8 @@ async function createCustomer(ctx, label = "Customer") {
 
 async function scenarioTeam(ctx) {
   ctx.currentScenario = "team";
-  if (!(await requireTables(ctx, ["users", "organization_memberships"]))) return;
+  if (!(await requireTables(ctx, ["users", "organization_memberships"])))
+    return;
   await ensureDemoTeam(ctx);
 
   if (await ctx.tableExists("organization_invites")) {
@@ -592,10 +663,12 @@ async function scenarioTeam(ctx) {
 
 async function scenarioTickets(ctx) {
   ctx.currentScenario = "tickets";
-  if (!(await requireTables(ctx, ["customers", "tickets", "ticket_texts"]))) return;
+  if (!(await requireTables(ctx, ["customers", "tickets", "ticket_texts"])))
+    return;
   await ensureDemoTeam(ctx);
 
-  const customer = (ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Ticket Customer")));
+  const customer =
+    ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Ticket Customer"));
   if (!customer) return;
 
   const supportUser = ctx.runtime.users.support;
@@ -699,7 +772,11 @@ async function scenarioTickets(ctx) {
       },
     ]);
 
-    if (tags[0] && tags[1] && (await ctx.tableExists("ticket_tag_assignments"))) {
+    if (
+      tags[0] &&
+      tags[1] &&
+      (await ctx.tableExists("ticket_tag_assignments"))
+    ) {
       await insertRows(ctx, "ticket_tag_assignments", [
         {
           organization_id: ctx.organization.id,
@@ -753,7 +830,8 @@ async function scenarioOrders(ctx) {
   ctx.currentScenario = "orders";
   if (!(await requireTables(ctx, ["orders", "order_items"]))) return;
 
-  const customer = (ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Order Customer")));
+  const customer =
+    ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Order Customer"));
   if (!customer) return;
 
   const run = ctx.runtime.runTag;
@@ -869,7 +947,14 @@ async function scenarioOrders(ctx) {
 
 async function scenarioIncidents(ctx) {
   ctx.currentScenario = "incidents";
-  if (!(await requireTables(ctx, ["status_services", "incidents", "incident_updates"]))) return;
+  if (
+    !(await requireTables(ctx, [
+      "status_services",
+      "incidents",
+      "incident_updates",
+    ]))
+  )
+    return;
 
   const serviceA = await insertRow(ctx, "status_services", {
     organization_id: ctx.organization.id,
@@ -969,13 +1054,34 @@ async function scenarioIncidents(ctx) {
 
 async function scenarioSla(ctx) {
   ctx.currentScenario = "sla";
-  if (!(await requireTables(ctx, ["sla_policies", "ticket_sla_events"]))) return;
+  if (!(await requireTables(ctx, ["sla_policies", "ticket_sla_events"])))
+    return;
 
   const policyRows = [
-    { priority: "low", first_response_minutes: 240, resolution_minutes: 2880, warning_minutes: 180 },
-    { priority: "medium", first_response_minutes: 120, resolution_minutes: 1440, warning_minutes: 90 },
-    { priority: "high", first_response_minutes: 60, resolution_minutes: 720, warning_minutes: 45 },
-    { priority: "urgent", first_response_minutes: 30, resolution_minutes: 240, warning_minutes: 20 },
+    {
+      priority: "low",
+      first_response_minutes: 240,
+      resolution_minutes: 2880,
+      warning_minutes: 180,
+    },
+    {
+      priority: "medium",
+      first_response_minutes: 120,
+      resolution_minutes: 1440,
+      warning_minutes: 90,
+    },
+    {
+      priority: "high",
+      first_response_minutes: 60,
+      resolution_minutes: 720,
+      warning_minutes: 45,
+    },
+    {
+      priority: "urgent",
+      first_response_minutes: 30,
+      resolution_minutes: 240,
+      warning_minutes: 20,
+    },
   ];
 
   for (const row of policyRows) {
@@ -1034,7 +1140,8 @@ async function scenarioSla(ctx) {
 
 async function scenarioAutomation(ctx) {
   ctx.currentScenario = "automation";
-  if (!(await requireTables(ctx, ["automation_rules", "automation_rule_runs"]))) return;
+  if (!(await requireTables(ctx, ["automation_rules", "automation_rule_runs"])))
+    return;
 
   const runTag = ctx.runtime.runTag;
   const createdRule = await insertRow(ctx, "automation_rules", {
@@ -1044,7 +1151,10 @@ async function scenarioAutomation(ctx) {
     description: "Assign urgent tickets to manager and notify.",
     trigger_event: "ticket.created",
     conditions: { priority: ["urgent"] },
-    actions: [{ type: "assign", target: "manager" }, { type: "notify", target: "manager" }],
+    actions: [
+      { type: "assign", target: "manager" },
+      { type: "notify", target: "manager" },
+    ],
     is_enabled: true,
     created_by: ctx.actorUser.id,
     created_at: nowIso(),
@@ -1117,7 +1227,8 @@ async function scenarioCommunications(ctx) {
   ctx.currentScenario = "communications";
   if (!(await requireTables(ctx, ["customer_communications"]))) return;
 
-  const customer = (ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Comms Customer")));
+  const customer =
+    ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Comms Customer"));
   if (!customer) return;
 
   const ticketId = ctx.runtime.tickets[0]?.id ?? null;
@@ -1200,7 +1311,14 @@ async function scenarioCommunications(ctx) {
 
 async function scenarioRbac(ctx) {
   ctx.currentScenario = "rbac";
-  if (!(await requireTables(ctx, ["custom_roles", "custom_role_permissions", "approval_policies", "approval_requests"]))) {
+  if (
+    !(await requireTables(ctx, [
+      "custom_roles",
+      "custom_role_permissions",
+      "approval_policies",
+      "approval_requests",
+    ]))
+  ) {
     return;
   }
   await ensureDemoTeam(ctx);
@@ -1240,7 +1358,9 @@ async function scenarioRbac(ctx) {
     .eq("user_id", ctx.runtime.users.manager.id)
     .maybeSingle();
   if (managerMembership.error) {
-    throw new Error(`Failed to load manager membership: ${managerMembership.error.message}`);
+    throw new Error(
+      `Failed to load manager membership: ${managerMembership.error.message}`,
+    );
   }
   if (managerMembership.data) {
     await ctx.supabase
@@ -1308,11 +1428,18 @@ async function scenarioRbac(ctx) {
 
 async function scenarioPortal(ctx) {
   ctx.currentScenario = "portal";
-  if (!(await requireTables(ctx, ["customer_portal_identities", "customer_portal_login_links", "customer_portal_sessions"]))) {
+  if (
+    !(await requireTables(ctx, [
+      "customer_portal_identities",
+      "customer_portal_login_links",
+      "customer_portal_sessions",
+    ]))
+  ) {
     return;
   }
 
-  const customer = (ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Portal Customer")));
+  const customer =
+    ctx.runtime.customers[0] ?? (await createCustomer(ctx, "Portal Customer"));
   if (!customer) return;
 
   const portalUserEmail = `portal.${ctx.runtime.runTag}@example.com`;
@@ -1363,7 +1490,13 @@ async function scenarioPortal(ctx) {
 
 async function scenarioAnalytics(ctx) {
   ctx.currentScenario = "analytics";
-  if (!(await requireTables(ctx, ["analytics_report_schedules", "analytics_report_runs", "analytics_metric_snapshots"]))) {
+  if (
+    !(await requireTables(ctx, [
+      "analytics_report_schedules",
+      "analytics_report_runs",
+      "analytics_metric_snapshots",
+    ]))
+  ) {
     return;
   }
 
@@ -1580,16 +1713,26 @@ async function buildContext(supabase, options) {
   };
 
   if (!(await tableExists("users"))) {
-    throw new Error('Table "users" is required. Run db/topbar-schema.sql first.');
+    throw new Error(
+      'Table "users" is required. Run db/topbar-schema.sql first.',
+    );
   }
   if (!(await tableExists("organizations"))) {
-    throw new Error('Table "organizations" is required. Run db/topbar-schema.sql first.');
+    throw new Error(
+      'Table "organizations" is required. Run db/topbar-schema.sql first.',
+    );
   }
   if (!(await tableExists("organization_memberships"))) {
-    throw new Error('Table "organization_memberships" is required. Run db/topbar-schema.sql first.');
+    throw new Error(
+      'Table "organization_memberships" is required. Run db/topbar-schema.sql first.',
+    );
   }
 
-  const actorUser = await ensureUserByEmail(baseCtx, options.email, options.createUser);
+  const actorUser = await ensureUserByEmail(
+    baseCtx,
+    options.email,
+    options.createUser,
+  );
   const organization = await resolveOrganization(baseCtx, actorUser, options);
 
   return {
@@ -1610,13 +1753,17 @@ function printSummary(ctx, scenarioNames) {
   console.log("");
   console.log("Tinker run complete.");
   console.log(`- User: ${ctx.actorUser.email} (${ctx.actorUser.id})`);
-  console.log(`- Organization: ${ctx.organization.name} (${ctx.organization.slug})`);
+  console.log(
+    `- Organization: ${ctx.organization.name} (${ctx.organization.slug})`,
+  );
   console.log(`- Run tag: ${ctx.runtime.runTag}`);
   console.log(`- Requested scenarios: ${scenarioNames.join(", ")}`);
   console.log(
-    `- Completed scenarios: ${Object.keys(ctx.runtime.completed)
-      .filter((key) => ctx.runtime.completed[key])
-      .join(", ") || "none"}`,
+    `- Completed scenarios: ${
+      Object.keys(ctx.runtime.completed)
+        .filter((key) => ctx.runtime.completed[key])
+        .join(", ") || "none"
+    }`,
   );
   console.log(
     `- Seeded entities: users=${Object.keys(ctx.runtime.users).length}, customers=${ctx.runtime.customers.length}, tickets=${ctx.runtime.tickets.length}, orders=${ctx.runtime.orders.length}, incidents=${ctx.runtime.incidents.length}`,
@@ -1643,13 +1790,17 @@ async function main() {
   }
 
   if (!options.email) {
-    throw new Error('Missing --email. Use --email user@company.com or run with --list-users first.');
+    throw new Error(
+      "Missing --email. Use --email user@company.com or run with --list-users first.",
+    );
   }
 
   const scenarioNames = parseScenarioList(options.scenario);
   const ctx = await buildContext(supabase, options);
 
-  ctx.log.info(`Running scenarios for ${ctx.actorUser.email} in org ${ctx.organization.slug}`);
+  ctx.log.info(
+    `Running scenarios for ${ctx.actorUser.email} in org ${ctx.organization.slug}`,
+  );
   for (const name of scenarioNames) {
     const runner = SCENARIO_RUNNERS[name];
     if (!runner) {
@@ -1662,7 +1813,15 @@ async function main() {
   printSummary(ctx, scenarioNames);
 }
 
-main().catch((error) => {
-  console.error(`[tinker] ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+// ponytail: only auto-run the CLI when invoked directly, so app code (demo reset) can import
+// buildContext/SCENARIO_RUNNERS below without triggering a live seed run as a side effect of import.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(
+      `[tinker] ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exitCode = 1;
+  });
+}
+
+export { buildContext, SCENARIO_RUNNERS, SCENARIO_ORDER };
