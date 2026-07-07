@@ -1,16 +1,22 @@
 [
-  {
-    "file": "screenshots/hero-desktop.png",
-    "alt": "OpsDesk login page in desktop light mode: an email/password sign-in form, a 'Send Magic Link' passwordless option, and a 'Sign in with Google' button below an 'OR CONTINUE WITH' divider",
-    "width": 1440,
-    "height": 900,
-    "for": "hero"
-  },
-  {
-    "file": "screenshots/hero-mobile.png",
-    "alt": "The same OpsDesk login page reflowed to a single-column mobile layout at 390px width, all sign-in options stacked vertically",
-    "width": 390,
-    "height": 844,
-    "for": "hero"
-  }
+  { "page": "login", "path": "/login", "note": "Logged-out state" },
+  { "page": "dashboard", "path": "/", "note": "Authenticated landing view — KPI cards, revenue chart, SLA compliance trend" },
+  { "page": "notifications", "path": "/notifications (via bell icon)", "note": "Dedicated notifications page, not an overlay dropdown" },
+  { "page": "tickets-list", "path": "/tickets", "note": "Ticket table with filters/saved views" },
+  { "page": "tickets-detail", "path": "/tickets/[id]", "note": "Opened by clicking a ticket ID in the list — conversation thread + details sidebar" },
+  { "page": "orders-list", "path": "/orders", "note": "Order table" },
+  { "page": "orders-detail", "path": "/orders/[id]", "note": "Opened by clicking an order ID — line items, payment status, Stripe payment link" },
+  { "page": "customers-list", "path": "/customers", "note": "Customer table" },
+  { "page": "customers-detail", "path": "/customers/[id]", "note": "Opened by clicking a customer name — overview/conversations/activity/tickets/orders tabs" },
+  { "page": "incidents", "path": "/incidents", "note": "Internal incidents & services admin view" },
+  { "page": "public-status-page", "path": "/status/test-workspace", "note": "Unauthenticated public status page — no login required" },
+  { "page": "reports", "path": "/reports", "note": "Executive analytics/reporting view" },
+  { "page": "calendar", "path": "/calendar", "note": "Calendar view" },
+  { "page": "settings-team", "path": "/settings/team", "note": "Team management settings tab" },
+  { "page": "settings-roles", "path": "/settings/roles", "note": "Custom RBAC & approvals settings tab" },
+  { "page": "settings-sla", "path": "/settings/sla", "note": "SLA & escalation policy configuration tab" },
+  { "page": "settings-automation", "path": "/settings/automation", "note": "Workflow automation rules tab" },
+  { "page": "settings-activity", "path": "/settings/activity", "note": "Activity/audit log tab" },
+  { "page": "account", "path": "/account/profile", "note": "Account profile page (avatar upload, personal details, security) — reached via the avatar dropdown menu, not a direct /account URL" },
+  { "page": "help", "path": "/help", "note": "Help Center — FAQs and a contact-support form" }
 ]

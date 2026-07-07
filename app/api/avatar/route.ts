@@ -1,3 +1,3 @@
-import { handleRequest } from "facehash/next";
+import { toFacehashHandler } from "facehash/next";
 
-export const GET = handleRequest;
+export const { GET } = toFacehashHandler();
