@@ -1,3 +1,12 @@
+import { loadEnvConfig } from "@next/env";
+
+const originalNodeEnv = process.env.NODE_ENV;
+// @ts-ignore
+process.env.NODE_ENV = "development";
+loadEnvConfig(process.cwd(), true);
+// @ts-ignore
+process.env.NODE_ENV = originalNodeEnv;
+
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";

@@ -8,12 +8,17 @@ const replaceMock = vi.fn();
 const signInMock = vi.fn();
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
+const signInWithPasswordMock = vi.fn();
+const getSessionMock = vi.fn();
+const signOutMock = vi.fn();
+const signInWithOAuthMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: pushMock,
     replace: replaceMock,
   }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 vi.mock("next-auth/react", () => ({
@@ -27,6 +32,17 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      signInWithPassword: (...args: unknown[]) => signInWithPasswordMock(...args),
+      getSession: (...args: unknown[]) => getSessionMock(...args),
+      signOut: (...args: unknown[]) => signOutMock(...args),
+      signInWithOAuth: (...args: unknown[]) => signInWithOAuthMock(...args),
+    },
+  },
+}));
+
 describe("Login page", () => {
   beforeEach(() => {
     pushMock.mockReset();
@@ -34,21 +50,37 @@ describe("Login page", () => {
     signInMock.mockReset();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
+    signInWithPasswordMock.mockReset();
+    getSessionMock.mockReset();
+    signOutMock.mockReset();
+    signInWithOAuthMock.mockReset();
     window.history.pushState({}, "", "/login");
   });
 
-  it("renders login form with disabled Google sign-in label", () => {
+  it("renders login form with Google sign-in button", () => {
     render(<LoginPage />);
 
-    expect(screen.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Welcome Back" })).toBeVisible();
     expect(screen.getByLabelText("Email")).toBeVisible();
     expect(screen.getByLabelText("Password")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Google sign-in (coming soon)" }),
-    ).toBeDisabled();
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeEnabled();
   });
 
   it("submits credentials and routes to home on success", async () => {
+    signInWithPasswordMock.mockResolvedValue({
+      data: { user: { id: "user-123", user_metadata: {} } },
+      error: null,
+    });
+    getSessionMock.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "access-token-123",
+          refresh_token: "refresh-token-123",
+        },
+      },
+    });
     signInMock.mockResolvedValue({ ok: true, error: undefined });
 
     const user = userEvent.setup();
@@ -56,13 +88,21 @@ describe("Login page", () => {
 
     await user.type(screen.getByLabelText("Email"), "john@acme.com");
     await user.type(screen.getByLabelText("Password"), "secret123");
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
 
     await waitFor(() => {
-      expect(signInMock).toHaveBeenCalledWith("credentials", {
-        redirect: false,
+      expect(signInWithPasswordMock).toHaveBeenCalledWith({
         email: "john@acme.com",
         password: "secret123",
+      });
+    });
+
+    await waitFor(() => {
+      expect(signInMock).toHaveBeenCalledWith("supabase-token", {
+        redirect: false,
+        accessToken: "access-token-123",
+        refreshToken: "refresh-token-123",
+        mfaAssertion: undefined,
       });
     });
 
@@ -73,14 +113,17 @@ describe("Login page", () => {
   });
 
   it("shows mapped error when credentials are invalid", async () => {
-    signInMock.mockResolvedValue({ ok: false, error: "CredentialsSignin" });
+    signInWithPasswordMock.mockResolvedValue({
+      data: { user: null },
+      error: new Error("Invalid login credentials"),
+    });
 
     const user = userEvent.setup();
     render(<LoginPage />);
 
     await user.type(screen.getByLabelText("Email"), "john@acme.com");
     await user.type(screen.getByLabelText("Password"), "wrong-pass");
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
 
     expect(
       await screen.findByText("Invalid email or password"),
@@ -112,9 +155,9 @@ describe("Login page", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    expect(await screen.findByText("Email Verified!")).toBeInTheDocument();
+    expect(await screen.findByText("Email Verified")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Go to login now" }));
+    await user.click(screen.getByRole("button", { name: "Continue to Login" }));
     expect(replaceMock).toHaveBeenCalledWith("/login");
   });
 });

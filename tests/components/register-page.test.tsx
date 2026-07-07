@@ -31,7 +31,7 @@ describe("Register page", () => {
     window.history.pushState({}, "", "/register");
   });
 
-  it("renders register form with disabled Google sign-in label", () => {
+  it("renders register form with Google sign-in button", () => {
     render(<RegisterPage />);
 
     expect(
@@ -40,8 +40,8 @@ describe("Register page", () => {
     expect(screen.getByLabelText("First Name")).toBeVisible();
     expect(screen.getByLabelText("Work Email")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Google sign-in (coming soon)" }),
-    ).toBeDisabled();
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeEnabled();
   });
 
   it("shows mismatch error and does not call API when passwords are different", async () => {
